@@ -454,90 +454,295 @@ def prepare_network(
 
 def add_CCL_constraints(n, config):
     """
-    Add CCL (country & carrier limit) constraint to the network.
-
-    Add minimum and maximum levels of generator nominal capacity per carrier
-    for individual countries. Opts and path for agg_p_nom_minmax.csv must be defined
-    in config.yaml. Default file is available at data/agg_p_nom_minmax.csv.
-
-    Parameters
-    ----------
-    n : pypsa.Network
-    config : dict
-
-    Example
-    -------
-    scenario:
-        opts: [Co2L-CCL-24h]
-    electricity:
-        agg_p_nom_limits: data/agg_p_nom_minmax.csv
+    Add CCL (country & carrier limit) constraint to the network and set fixed capacities.
     """
-    agg_p_nom_minmax = pd.read_csv(
-        config["solving"]["agg_p_nom_limits"]["file"], index_col=[0, 1], header=[0, 1]
-    )[snakemake.wildcards.planning_horizons]
-    logger.info("Adding generation capacity constraints per carrier and country")
-    p_nom = n.model["Generator-p_nom"]
+    logger.info("=== Starting CCL Constraint Addition ===")
 
-    gens = n.generators.query("p_nom_extendable").rename_axis(index="Generator-ext")
-    if config["solving"]["agg_p_nom_limits"]["agg_offwind"]:
-        rename_offwind = {
-            "offwind-ac": "offwind-all",
-            "offwind-dc": "offwind-all",
-            "offwind": "offwind-all",
-        }
-        gens = gens.replace(rename_offwind)
-    grouper = pd.concat([gens.bus.map(n.buses.country), gens.carrier], axis=1)
-    lhs = p_nom.groupby(grouper).sum().rename(bus="country")
+    try:
+        # Read limits with multi-level columns
+        agg_p_nom_minmax = pd.read_csv(
+            config["solving"]["agg_p_nom_limits"]["file"],
+            index_col=[0, 1],
+            header=[0, 1]
+        )[snakemake.wildcards.planning_horizons]
 
-    if config["solving"]["agg_p_nom_limits"]["include_existing"]:
-        gens_cst = n.generators.query("~p_nom_extendable").rename_axis(
-            index="Generator-cst"
-        )
-        gens_cst = gens_cst[
-            (gens_cst["build_year"] + gens_cst["lifetime"])
-            >= int(snakemake.wildcards.planning_horizons)
-        ]
-        if config["solving"]["agg_p_nom_limits"]["agg_offwind"]:
-            gens_cst = gens_cst.replace(rename_offwind)
-        rhs_cst = (
-            pd.concat(
-                [gens_cst.bus.map(n.buses.country), gens_cst[["carrier", "p_nom"]]],
-                axis=1,
+        # List of technologies to fix
+        fixed_techs = ['onwind', 'offwind-ac', 'offwind-dc', 'solar', 'solar rooftop']
+
+        for idx, row in agg_p_nom_minmax.iterrows():
+            country, carrier = idx
+            min_val = row['min']
+            max_val = row['max']
+
+            # Get all generators for this country and carrier
+            gens_mask = (
+                    (n.generators.bus.map(n.buses.country) == country) &
+                    (n.generators.carrier == carrier)
             )
-            .groupby(["bus", "carrier"])
-            .sum()
-        )
-        rhs_cst.index = rhs_cst.index.rename({"bus": "country"})
-        rhs_min = agg_p_nom_minmax["min"].dropna()
-        idx_min = rhs_min.index.join(rhs_cst.index, how="left")
-        rhs_min = rhs_min.reindex(idx_min).fillna(0)
-        rhs = (rhs_min - rhs_cst.reindex(idx_min).fillna(0).p_nom).dropna()
-        rhs[rhs < 0] = 0
-        minimum = xr.DataArray(rhs).rename(dim_0="group")
-    else:
-        minimum = xr.DataArray(agg_p_nom_minmax["min"].dropna()).rename(dim_0="group")
+            relevant_gens = n.generators[gens_mask]
 
-    index = minimum.indexes["group"].intersection(lhs.indexes["group"])
-    if not index.empty:
-        n.model.add_constraints(
-            lhs.sel(group=index) >= minimum.loc[index], name="agg_p_nom_min"
-        )
+            if relevant_gens.empty:
+                logger.warning(f"No generators found for {carrier} in {country}")
+                continue
 
-    if config["solving"]["agg_p_nom_limits"]["include_existing"]:
-        rhs_max = agg_p_nom_minmax["max"].dropna()
-        idx_max = rhs_max.index.join(rhs_cst.index, how="left")
-        rhs_max = rhs_max.reindex(idx_max).fillna(0)
-        rhs = (rhs_max - rhs_cst.reindex(idx_max).fillna(0).p_nom).dropna()
-        rhs[rhs < 0] = 0
-        maximum = xr.DataArray(rhs).rename(dim_0="group")
-    else:
-        maximum = xr.DataArray(agg_p_nom_minmax["max"].dropna()).rename(dim_0="group")
+            if carrier in fixed_techs:
+                # For fixed technologies, set exact capacities
+                if not np.isclose(min_val, max_val):
+                    logger.warning(
+                        f"Min and max values differ for fixed technology {carrier}. Using min value: {min_val}")
 
-    index = maximum.indexes["group"].intersection(lhs.indexes["group"])
-    if not index.empty:
-        n.model.add_constraints(
-            lhs.sel(group=index) <= maximum.loc[index], name="agg_p_nom_max"
-        )
+                target_capacity = min_val
+                current_capacity = relevant_gens.p_nom.sum()
+
+                logger.info(f"\nSetting fixed capacity for {carrier} in {country}:")
+                logger.info(f"Target capacity: {target_capacity:.2f} MW")
+                logger.info(f"Current capacity: {current_capacity:.2f} MW")
+
+                # Make all generators non-extendable
+                n.generators.loc[relevant_gens.index, 'p_nom_extendable'] = False
+
+                if len(relevant_gens) > 1:
+                    # Distribute capacity proportionally among generators
+                    scaling_factor = target_capacity / current_capacity
+                    for idx in relevant_gens.index:
+                        old_capacity = n.generators.loc[idx, 'p_nom']
+                        new_capacity = old_capacity * scaling_factor
+                        n.generators.loc[idx, 'p_nom'] = new_capacity
+                        logger.info(f"Generator {idx}: {old_capacity:.2f} MW → {new_capacity:.2f} MW")
+                else:
+                    # Set capacity directly for single generator
+                    idx = relevant_gens.index[0]
+                    old_capacity = n.generators.loc[idx, 'p_nom']
+                    n.generators.loc[idx, 'p_nom'] = target_capacity
+                    logger.info(f"Generator {idx}: {old_capacity:.2f} MW → {target_capacity:.2f} MW")
+
+                # Verify the total capacity
+                new_total = n.generators.loc[relevant_gens.index, 'p_nom'].sum()
+                logger.info(f"New total capacity: {new_total:.2f} MW")
+
+                if not np.isclose(new_total, target_capacity, rtol=1e-3):
+                    logger.warning(
+                        f"Warning: New capacity {new_total:.2f} MW differs from target {target_capacity:.2f} MW")
+
+            else:
+                # For other technologies, add min/max constraints as before
+                extendable_gens = relevant_gens[relevant_gens.p_nom_extendable]
+
+                if extendable_gens.empty:
+                    logger.warning(f"No extendable generators found for {carrier} in {country}")
+                    continue
+
+                # Get model components
+                p_nom = n.model["Generator-p_nom"]
+                lhs = p_nom.loc[extendable_gens.index].sum()
+
+                # Add minimum constraint if applicable
+                if min_val > 0:
+                    constraint_name = f"agg_p_nom_min_{country}_{carrier}"
+                    n.model.add_constraints(
+                        lhs >= min_val,
+                        name=constraint_name
+                    )
+                    logger.info(f"Added minimum constraint: {constraint_name} >= {min_val}")
+
+                # Add maximum constraint if applicable
+                if max_val < float('inf'):
+                    constraint_name = f"agg_p_nom_max_{country}_{carrier}"
+                    n.model.add_constraints(
+                        lhs <= max_val,
+                        name=constraint_name
+                    )
+                    logger.info(f"Added maximum constraint: {constraint_name} <= {max_val}")
+
+        logger.info("\nAll CCL constraints and fixed capacities set successfully")
+
+    except Exception as e:
+        logger.error(f"Error in CCL constraint addition: {str(e)}")
+        logger.error("Traceback:", exc_info=True)
+        raise
+
+    return n
+
+
+import logging
+
+import logging
+
+
+import logging
+
+
+def add_CLL_constraints(n, config):
+    """
+    Add CLL constraints for coal, lignite, CCGT, and OCGT (implemented as links)
+    using planning_year from snakemake.wildcards.planning_horizons.
+
+    For each year, a dictionary defines min/max capacities.
+    The function zeroes out existing capacities in DE and then adds or updates one link per carrier.
+
+    For gas-based carriers:
+      - For CCGT we now fix the capacity (p_nom_extendable=False) so that the solver is forced
+        to invest at least the minimum capacity.
+      - For OCGT the link remains extendable.
+
+    Make sure that the buses 'EU gas', 'EU coal', 'EU lignite', and 'DE0 0' exist in n.buses.
+    """
+    logging.info("====== STARTING CLL CONSTRAINTS FOR LINKS AND GENERATORS ======")
+
+    try:
+        # 1) Read planning year from snakemake wildcards
+        planning_year = int(snakemake.wildcards.planning_horizons)
+        de_buses = n.buses[n.buses.country == 'DE'].index
+
+        # 2) Capacity targets for each year
+        capacities = {
+            '2020': {
+                'coal': {'min': 20000, 'max': 20000},
+                'lignite': {'min': 20000, 'max': 20000},
+                'CCGT': {'min': 39000, 'max': 39000},
+                'OCGT': {'min': 1000, 'max': 1000}
+            },
+
+            '2025': {
+                'coal': {'min': 17000, 'max': 17000},
+                'lignite': {'min': 17000, 'max': 17000},
+                'CCGT': {'min': 39000, 'max': 39000},
+                'OCGT': {'min': 1000, 'max': 1000}
+            },
+
+            '2030': {
+                'coal': {'min': 8000, 'max': 8000},
+                'lignite': {'min': 8000, 'max': 8000},
+                'CCGT': {'min': 39000, 'max': 39000},
+                'OCGT': {'min': 1000, 'max': 1000}
+            },
+
+            '2035': {
+                'coal': {'min': 2000, 'max': 2000},
+                'lignite': {'min': 2000, 'max': 2000},
+                'CCGT': {'min': 45000, 'max': 45000},
+                'OCGT': {'min': 1000, 'max': 1000}
+            },
+
+            '2040': {
+                'coal': {'min': 0, 'max': 0},
+                'lignite': {'min': 0, 'max': 0},
+                'CCGT': {'min': 51000, 'max': 51000},
+                'OCGT': {'min': 1000, 'max': 1000}
+            },
+            '2045': {
+                'coal': {'min': 0, 'max': 0},
+                'lignite': {'min': 0, 'max': 0},
+                'CCGT': {'min': 50000, 'max': 50000},
+                'OCGT': {'min': 1900, 'max': 1900}
+            }
+        }
+
+        year_str = str(planning_year)
+        if year_str not in capacities:
+            raise ValueError(f"No capacity targets defined for year {year_str}")
+
+        year_capacities = capacities[year_str]
+
+        # 3) Zero out existing capacity in DE for the four carriers
+        for carrier in ['coal', 'lignite', 'CCGT', 'OCGT']:
+            if carrier not in n.carriers.index:
+                logging.info(f"Defining missing carrier '{carrier}' in n.carriers.")
+                n.carriers.loc[carrier, "nice_name"] = carrier
+
+            existing_units = n.links.loc[
+                (n.links.carrier == carrier) &
+                (n.links.bus1.isin(de_buses))
+                ]
+            if not existing_units.empty:
+                logging.info(f"Zeroing capacity for {len(existing_units)} existing {carrier} link(s) in DE.")
+                n.links.loc[existing_units.index, "p_nom"] = 0
+                n.links.loc[existing_units.index, "p_nom_extendable"] = False
+                n.links.loc[existing_units.index, "p_nom_min"] = 0
+                n.links.loc[existing_units.index, "p_nom_max"] = 0
+
+        # 4) Add or update link for each carrier from the capacity dictionary
+        for carrier, caps in year_capacities.items():
+            min_cap = caps['min']
+            max_cap = caps['max']
+
+            if min_cap <= 0 and max_cap <= 0:
+                logging.info(f"{carrier.capitalize()} capacity in {year_str} is 0 MW - skipping link creation.")
+                continue
+
+            new_unit = f"DE0 0 {carrier}-{planning_year}"
+            if carrier in ['CCGT', 'OCGT']:
+                bus0 = 'EU gas'
+                # For CCGT, we now force a fixed capacity; for OCGT, use extendable as usual.
+                if carrier == 'CCGT':
+                    is_extendable = False
+                else:
+                    is_extendable = (min_cap != max_cap)
+                efficiency = 0.6 if carrier == 'CCGT' else 0.4
+            else:
+                bus0 = f"EU {carrier}"
+                is_extendable = (min_cap != max_cap)
+                efficiency = 1.0
+
+            if "DE0 0" not in n.buses.index:
+                logging.warning("Bus 'DE0 0' not found in n.buses; link might not connect properly.")
+
+            if new_unit in n.links.index:
+                n.links.at[new_unit, 'p_nom'] = min_cap
+                n.links.at[new_unit, 'p_nom_min'] = min_cap
+                n.links.at[new_unit, 'p_nom_max'] = max_cap
+                n.links.at[new_unit, 'p_nom_extendable'] = is_extendable
+                n.links.at[new_unit, 'efficiency'] = efficiency
+                msg = "Updated"
+            else:
+                n.add(
+                    "Link",
+                    new_unit,
+                    bus0=bus0,
+                    bus1="DE0 0",
+                    carrier=carrier,
+                    p_nom=min_cap,
+                    p_nom_min=min_cap,
+                    p_nom_max=max_cap,
+                    p_nom_extendable=is_extendable,
+                    efficiency=efficiency
+                )
+                msg = "Added"
+
+            if min_cap == max_cap:
+                logging.info(f"{msg} {carrier} unit with fixed capacity: {min_cap} MW for year {year_str}")
+            else:
+                logging.info(f"{msg} {carrier} unit with capacity range: {min_cap}-{max_cap} MW for year {year_str}")
+
+        # 5) Log final capacities for each carrier
+        logging.info("\n====== FINAL CONFIGURATIONS ======")
+        total_capacities = {c: 0 for c in ['coal', 'lignite', 'CCGT', 'OCGT']}
+
+        for carrier in ['coal', 'lignite', 'CCGT', 'OCGT']:
+            units = n.links.loc[
+                (n.links.carrier == carrier) &
+                (n.links.bus1.isin(de_buses))
+                ]
+            total_cap = units["p_nom"].sum()
+            total_min = units["p_nom_min"].sum()
+            total_max = units["p_nom_max"].sum()
+            total_capacities[carrier] = total_min
+
+            logging.info(f"\nDE {carrier}:")
+            logging.info(f"  - Current capacity: {total_cap:.1f} MW")
+            logging.info(f"  - Min capacity: {total_min:.1f} MW")
+            logging.info(f"  - Max capacity: {total_max:.1f} MW")
+
+        logging.info("\nTotal Capacities:")
+        for c, cap in total_capacities.items():
+            logging.info(f"{c}: {cap:.1f} MW")
+        logging.info(f"Total Gas: {total_capacities['CCGT'] + total_capacities['OCGT']:.1f} MW")
+
+    except Exception as e:
+        logging.error(f"Error while processing limits: {e}", exc_info=True)
+        raise
+
+    return n
 
 
 def add_EQ_constraints(n, o, scaling=1e-1):
@@ -950,6 +1155,9 @@ def extra_functionality(n, snapshots):
         add_SAFE_constraints(n, config)
     if constraints["CCL"] and n.generators.p_nom_extendable.any():
         add_CCL_constraints(n, config)
+        # Add CLL constraints if enabled
+    if constraints.get("CLL", True):  # Enable by default
+        add_CLL_constraints(n, config)
 
     reserve = config["electricity"].get("operational_reserve", {})
     if reserve.get("activate"):
@@ -986,6 +1194,99 @@ def extra_functionality(n, snapshots):
         module = importlib.import_module(module_name)
         custom_extra_functionality = getattr(module, module_name)
         custom_extra_functionality(n, snapshots, snakemake)
+
+
+
+
+def check_constraint_feasibility(n, config):
+    """
+    Check and adjust CLL constraints before solving.
+    """
+    logger.info("=== Checking Constraint Feasibility ===")
+
+    try:
+        # Use direct path to the limits file
+        constraints_df = pd.read_csv("data/technology_limits.csv")
+
+        planning_horizon = str(snakemake.wildcards.planning_horizons)
+        year_constraints = constraints_df[constraints_df['year'] == int(planning_horizon)]
+
+        if year_constraints.empty:
+            raise KeyError(f"No constraints found for year {planning_horizon}")
+
+        logger.info(f"\nProcessing constraints for year {planning_horizon}")
+
+        for _, row in year_constraints.iterrows():
+            country = row['country']
+            technology = row['technology']
+            min_cap = row['capacity_min_mw']
+            max_cap = row['capacity_max_mw']
+
+            if technology in ['coal', 'lignite']:
+                # Get relevant links for coal and lignite
+                relevant_units = n.links[
+                    (n.links.carrier == technology) &
+                    (n.links.bus0 == f'EU {technology}') &
+                    (n.links.bus1.map(n.buses.country) == country)
+                ]
+
+                if relevant_units.empty:
+                    logger.warning(f"No links found for {technology} in {country}")
+                    continue
+
+                logger.info(f"\nProcessing {country} {technology} (links):")
+                logger.info(f"Required capacity: {min_cap} MW")
+
+                # Check feasibility for fixed capacity
+                total_possible = relevant_units.p_nom_max.sum()
+                if total_possible < min_cap:
+                    logger.warning(
+                        f"Required capacity {min_cap} MW exceeds maximum possible "
+                        f"capacity {total_possible} MW for {technology} in {country}"
+                    )
+
+            else:  # For CCGT and OCGT
+                # Get relevant generators
+                relevant_units = n.generators[
+                    (n.generators.carrier == technology) &
+                    (n.generators.bus.map(n.buses.country) == country)
+                ]
+
+                if relevant_units.empty:
+                    logger.warning(f"No generators found for {technology} in {country}")
+                    continue
+
+                logger.info(f"\nProcessing {country} {technology} (generators):")
+                logger.info(f"Required capacity range: {min_cap} MW - {max_cap} MW")
+
+                # Check feasibility for extendable capacity
+                existing_cap = relevant_units.p_nom.sum()
+                max_possible = relevant_units.p_nom_max.sum()
+
+                logger.info(f"Current capacity: {existing_cap:.2f} MW")
+                logger.info(f"Maximum possible: {max_possible:.2f} MW")
+
+                if max_possible < min_cap:
+                    logger.warning(
+                        f"Minimum required capacity {min_cap} MW exceeds maximum possible "
+                        f"capacity {max_possible} MW for {technology} in {country}"
+                    )
+
+            logger.info(f"Processed {technology} in {country}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Error in constraint feasibility check: {str(e)}")
+        logger.error("Traceback:", exc_info=True)
+        if 'constraints_df' in locals():
+            logger.error("\nDataFrame information:")
+            logger.error(f"Shape: {constraints_df.shape}")
+            logger.error("Columns:")
+            logger.error(constraints_df.columns.tolist())
+            logger.error("\nFirst few rows:")
+            logger.error(constraints_df.head())
+        raise
 
 
 def solve_network(n, config, params, solving, **kwargs):
