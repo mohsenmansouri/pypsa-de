@@ -67,7 +67,7 @@ scenario:
   opts:
   - ''
   sector_opts:
-  - "24h"
+  - "1h"
   planning_horizons:
   #- 2020
   #- 2025
@@ -90,8 +90,6 @@ snapshots:
   start: "2019-01-01"
   end: "2020-01-01"
   inclusive: 'left'
-
-
 
 atlite:
   default_cutout: europe-2019-sarah3-era5
@@ -283,25 +281,7 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  dsm:
-    enable: true                # Set to true to enable DSM functionality
-    tech_potential: 0.10        # Proportion of peak load available for shifting (10% in this example)
-    time_shifting: 6            # Maximum duration of load shifting in hours
-    costs: # Costs by year
-      2025:
-        capital_cost: 100       # Cost for DSM power capacity in €/kW
-        storage_cost: 10        # Cost for DSM energy capacity in €/kWh
-      2030:
-        capital_cost: 80
-        storage_cost: 8
-      2040:
-        capital_cost: 50
-        storage_cost: 5
-      2045:
-        capital_cost: 40
-        storage_cost: 4
-  #v2g: false
-  #bev_dsm: 2030
+  v2g: false
   solar_thermal: false
   district_heating:
     potential: 0.3
@@ -453,7 +433,6 @@ solving:
       fractional_last_unit_size: true
   constraints:
     CLL: true
-    HPX: true
     efuel_export_ban: false
     limits_capacity_max:
       Generator:
@@ -463,8 +442,8 @@ solving:
             2025: 69
             2030: 115 # EEG2023 Ziel für 2030
             2035: 145 # EEG2023 Ziel für 2040
-            2040: 250
-            2045: 250
+            2040: 159 #250
+            2045: 160 #250
         offwind:
           DE:
             2020: 7.8
@@ -472,15 +451,15 @@ solving:
             2030: 29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
             2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
             2040: 65   # Planned projects until 2040 -1.5 GW for potential retirments
-            2045: 70
+            2045: 75.5 #70
         solar:
           DE:
             2020: 53.7
             2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
-            2030: 235 # PV Ziel 2030 + 20 GW
-            2035: 400
-            2040: 800
-            2045: 1000
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
+            2035: 300 #400
+            2040: 366 #800
+            2045: 400 #1000
       Store:
         co2 sequestered:
           DE:
@@ -515,25 +494,25 @@ solving:
       Generator:
         onwind:
           DE:
-            2030: 99    # Wind-an-Land Law 2028
-            2035: 115   # Wind-an-Land Law 2030
-            2040: 157   # target 2035
-            2045: 160   # target 2040
+            2030: 115 #99    # Wind-an-Land Law 2028
+            2035: 145 #115   # Wind-an-Land Law 2030
+            2040: 159 #157   # target 2035
+            2045: 160 #160   # target 2040
         offwind:
           DE:
-            2030: 22.5   # 75% Wind-auf-See Law
-            2035: 35
-            2040: 42
-            2045: 50
+            2030: 29.3 #22.5   # 75% Wind-auf-See Law
+            2035: 50 #35
+            2040: 65 #42
+            2045: 75.5 #50
         solar:
           DE:
               # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
               # assuming at least 1/3 of difference reached in 2025
-            2025: 101
-            2030: 101
-            2035: 101
-            2040: 101
-            2045: 101
+            2025: 110 #101
+            2030: 215 #101
+            2035: 300 #101
+            2040: 366 #101
+            2045: 400 #101
   # For reference, this are the values specified in the laws
   # limits_capacity_min:
   #     Generator:
@@ -615,7 +594,6 @@ solving:
         2035: 25
         2040: 30
         2045: 35
-
   # solver:
   #   options: gurobi-numeric-focus
   # solver_options:
@@ -664,11 +642,6 @@ electricity:
     force: 2035
     cost_factor: 0.15 # repurposing cost of OCGT gas to H2 in % investment cost in EUR/MW source: Christidis et al (2023) - H2-Ready-Gaskraftwerke, Table 3 https://reiner-lemoine-institut.de/wp-content/uploads/2023/11/RLI-Studie-H2-ready_DE.pdf
     efficiency_loss: 0.05
-  #extendable_carriers:
-    #Generator: [ solar, solar-hsat, onwind, offwind-ac, offwind-dc, OCGT, CCGT ]
-    #StorageUnit: [ ] # battery, H2
-    #Store: [ ]
-    #Link: [ ] # H2 pipeline
 
 pypsa_eur:
   Bus:
