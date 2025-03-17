@@ -1153,11 +1153,84 @@ def add_heat_pump_constraints(n):
     import logging
     import re
 
-
     logging.info("[HP constraints] Starting heat pump constraint application...")
-    print("DEBUG: Heat pump constraints function is being called")
 
-    # Get planning year more aggressively with multiple fallbacks
+    # Get config and check if constraints are enabled
+    if not hasattr(n, 'config'):
+        try:
+            n.config = snakemake.config
+            logging.info("[HP constraints] Got config from snakemake")
+        except (NameError, AttributeError):
+            logging.warning("[HP constraints] No config found, skipping heat pump constraints")
+            return
+
+    # Check the path in the config following PyPSA-DE structure
+    # Changed from hp_config = n.config.get('solving', {}).get('constraints', {}).get('heat_pumps', {})
+    hp_config = n.config["solving"].get("constraints", {}).get("heat_pumps", {})
+
+    # DEBUG: Log the structure of the config
+    try:
+        # First, try to log high-level keys
+        logging.info("[HP constraints] Config contains these top-level keys: " +
+                     str(list(n.config.keys())))
+
+        # Check if 'solving' exists
+        if 'solving' in n.config:
+            logging.info("[HP constraints] 'solving' section contains: " +
+                         str(list(n.config['solving'].keys())))
+
+            # Check if 'constraints' exists under solving
+            if 'constraints' in n.config['solving']:
+                logging.info("[HP constraints] 'solving.constraints' section contains: " +
+                             str(list(n.config['solving']['constraints'].keys())))
+
+                # Check if heat_pumps exists
+                if 'heat_pumps' in n.config['solving']['constraints']:
+                    logging.info("[HP constraints] Found heat_pumps configuration!")
+                    heat_pump_config = n.config['solving']['constraints']['heat_pumps']
+                    logging.info("[HP constraints] Heat pump config has keys: " +
+                                 str(list(heat_pump_config.keys())))
+                    logging.info("[HP constraints] apply_constraints is set to: " +
+                                 str(heat_pump_config.get('apply_constraints')))
+
+        # Also check if heat_pumps might be at top level or under constraints directly
+        if 'constraints' in n.config:
+            logging.info("[HP constraints] Top-level 'constraints' section contains: " +
+                         str(list(n.config['constraints'].keys())))
+
+            if 'heat_pumps' in n.config['constraints']:
+                logging.info("[HP constraints] Found heat_pumps in top-level constraints!")
+
+        if 'heat_pumps' in n.config:
+            logging.info("[HP constraints] Found heat_pumps at top level!")
+
+    except Exception as e:
+        logging.error(f"[HP constraints] Error inspecting config: {str(e)}")
+
+    # Try multiple possible paths for heat pump config
+    hp_config = None
+    possible_paths = [
+        # Path 1: As in your function
+        n.config.get('solving', {}).get('constraints', {}).get('heat_pumps', {}),
+        # Path 2: Directly under constraints
+        n.config.get('constraints', {}).get('heat_pumps', {}),
+        # Path 3: At top level
+        n.config.get('heat_pumps', {})
+    ]
+
+    # Try each path and use the first one that has apply_constraints=True
+    for i, path_config in enumerate(possible_paths):
+        if path_config.get('apply_constraints', False):
+            hp_config = path_config
+            logging.info(f"[HP constraints] Found enabled heat pump config at path {i + 1}")
+            break
+
+    # If none of the paths had apply_constraints=True
+    if hp_config is None or not hp_config.get('apply_constraints', False):
+        logging.info("[HP constraints] Heat pump constraints disabled in config, skipping")
+        return
+
+    # Get planning year with multiple fallbacks
     planning_year = None
 
     # Method 1: Try to get from snakemake wildcards
@@ -1235,7 +1308,6 @@ def add_heat_pump_constraints(n):
                             planning_year = 2025
                         else:
                             # Fallback to using a fixed year if snapshot year is 2019
-                            print(f"DEBUG: Using hardcoded year instead of {most_common_year}")
                             planning_year = 2030  # Default to 2030 if snapshot is 2019
                     else:
                         # Hardcode 2030 if snapshots are 2019
@@ -1256,147 +1328,151 @@ def add_heat_pump_constraints(n):
     year_str = str(planning_year)
     logging.info(f"[HP constraints] Final planning year: {year_str}")
 
-    # 2) Predefine min/max capacity for relevant heat pump carriers, by year
-    hp_capacities = {
-        "2020": {
-            "rural air heat pump": {"min": 0, "max": 1500},
-            "rural ground heat pump": {"min": 0, "max": 1500},
-            "urban central air heat pump": {"min": 0, "max": 2000},
-            "urban decentral air heat pump": {"min": 0, "max": 2000},
-        },
-        "2025": {
-            "rural air heat pump": {"min": 500, "max": 3500},
-            "rural ground heat pump": {"min": 300, "max": 3500},
-            "urban central air heat pump": {"min": 1000, "max": 5000},
-            "urban decentral air heat pump": {"min": 1000, "max": 5000},
-        },
-        "2030": {
-            "rural air heat pump": {"min": 100, "max": 100},
-            "rural ground heat pump": {"min": 200, "max": 200},
-            "urban central air heat pump": {"min": 300, "max": 300},
-            "urban decentral air heat pump": {"min": 400, "max": 400},
-        },
-        "2035": {
-            "rural air heat pump": {"min": 2000, "max": 9000},
-            "rural ground heat pump": {"min": 1000, "max": 8000},
-            "urban central air heat pump": {"min": 3000, "max": 12000},
-            "urban decentral air heat pump": {"min": 3000, "max": 12000},
-        },
-        "2040": {
-            "rural air heat pump": {"min": 3000, "max": 3000},
-            "rural ground heat pump": {"min": 3000, "max": 3000},
-            "urban central air heat pump": {"min": 6000, "max": 6000},
-            "urban decentral air heat pump": {"min": 6000, "max": 6000},
-        },
-        "2045": {
-            "rural air heat pump": {"min": 3000, "max": 3000},
-            "rural ground heat pump": {"min": 3000, "max": 3000},
-            "urban central air heat pump": {"min": 6000, "max": 6000},
-            "urban decentral air heat pump": {"min": 6000, "max": 6000},
-        },
-    }
+    # Get the active scenario from config
+    active_scenario = hp_config.get('active_scenario', 'medium')
+    logging.info(f"[HP constraints] Using {active_scenario} heat pump scenario from config")
 
-    if year_str not in hp_capacities:
-        logging.warning(f"[HP constraints] No HP capacity targets defined for {year_str}; skipping.")
-        return
+    # Get countries to apply constraints to
+    countries_to_process = hp_config.get('countries', [])
+    if not countries_to_process:
+        # If empty, apply to all countries in the network
+        countries_to_process = n.buses.country.unique().tolist()
+        logging.info(f"[HP constraints] Applying to all countries in network: {countries_to_process}")
+    else:
+        logging.info(f"[HP constraints] Applying to specified countries: {countries_to_process}")
 
-    # Log all available carriers to help with debugging
-    all_carriers = n.links.carrier.unique()
-    logging.info(f"[HP constraints] All link carriers in network: {all_carriers}")
+    # Get capacity targets by scenario
+    scenario_config = hp_config.get('scenarios', {}).get(active_scenario, {})
 
-    # 3) Gather the bus indices for Germany
-    de_buses = n.buses.index[n.buses.country == "DE"]
-    if de_buses.empty:
-        logging.warning("[HP constraints] Found no DE buses in the network. Skipping.")
-        return
+    # Add debug logging to see what's actually in the config
+    logging.info(f"[HP constraints] Available years in {active_scenario} scenario: {list(scenario_config.keys())}")
+    logging.info(f"[HP constraints] Types of year keys: {[type(k).__name__ for k in scenario_config.keys()]}")
 
-    # 4) Load the capacity targets for this year
-    year_dict = hp_capacities[year_str]
+    # Track totals for summary
+    countries_processed = 0
+    total_links_constrained = 0
 
-    # Check for missing carriers
-    missing_carriers = set(year_dict.keys()) - set(all_carriers)
-    if missing_carriers:
-        logging.warning(f"[HP constraints] Some heat pump carriers not found in network: {missing_carriers}")
+    # Process each country
+    for country in countries_to_process:
+        # In your config, the scenario data isn't nested under countries
+        # So we use the scenario_config directly
+        country_config = scenario_config  # Use scenario_config directly without country nesting
 
-    # 5) Loop over each HP carrier, apply min/max constraints
-    logging.info(
-        f"[HP constraints] Applying {'fixed' if year_str in ['2030', '2040', '2045'] else 'min/max'} capacities for heat pumps in {year_str}")
+        # Try to find the year in all possible formats
+        year_dict = None
 
-    # Track total values for summary
-    total_min = 0
-    total_max = 0
-    total_links = 0
-    applied_constraints = False
+        # Method 1: Direct lookup using string
+        if year_str in country_config:
+            year_dict = country_config[year_str]
+            logging.info(f"[HP constraints] Found year {year_str} as string key")
 
-    # Check if we're in a year with fixed capacities
-    fixed_capacity_years = ['2030', '2040', '2045']
-    is_fixed_year = year_str in fixed_capacity_years
+        # Method 2: Direct lookup using integer
+        elif planning_year in country_config:
+            year_dict = country_config[planning_year]
+            logging.info(f"[HP constraints] Found year {planning_year} as integer key")
 
-    for hp_carrier, caps in year_dict.items():
-        min_cap = caps["min"]
-        max_cap = caps["max"]
+        # Method 3: Compare string representations of keys
+        else:
+            for key in country_config.keys():
+                if str(key) == year_str:
+                    year_dict = country_config[key]
+                    logging.info(
+                        f"[HP constraints] Found year as key {key} (type: {type(key).__name__}) matching {year_str}")
+                    break
 
-        # Find all links whose carrier matches hp_carrier AND whose bus1 is in DE
-        relevant_links = n.links.index[
-            (n.links.carrier == hp_carrier) &
-            (n.links.bus1.isin(de_buses))
-            ]
-
-        if len(relevant_links) == 0:
-            logging.info(f"[HP constraints] No links found with carrier '{hp_carrier}' in DE")
+        # If we still couldn't find the year
+        if year_dict is None:
+            logging.warning(
+                f"[HP constraints] No HP capacity targets defined for {year_str} in {active_scenario}. Skipping {country}.")
+            # Debug what years are available
+            logging.info(f"[HP constraints] Available years: {list(country_config.keys())}")
             continue
 
-        # Calculate the current total capacity for this carrier
-        current_capacity = n.links.loc[relevant_links, "p_nom"].sum()
-        logging.info(
-            f"[HP constraints] Found {len(relevant_links)} links with carrier '{hp_carrier}' - current capacity: {current_capacity} MW")
+        # Get buses for this country
+        country_buses = n.buses.index[n.buses.country == country]
+        if country_buses.empty:
+            logging.warning(f"[HP constraints] Found no buses for {country}. Skipping.")
+            continue  # Skip this country and continue with the next one
 
-        # Apply constraints to each link
-        for link_name in relevant_links:
-            per_link_capacity = min_cap / len(relevant_links)
+        logging.info(f"[HP constraints] Processing country: {country} with {len(country_buses)} buses")
 
-            if is_fixed_year or min_cap == max_cap:
-                # For fixed capacity years, set p_nom directly and make non-extendable
-                n.links.at[link_name, "p_nom"] = per_link_capacity
-                n.links.at[link_name, "p_nom_extendable"] = False
+        # Check for missing carriers
+        all_carriers = n.links.carrier.unique()
+        missing_carriers = set(year_dict.keys()) - set(all_carriers)
+        if missing_carriers:
+            logging.warning(f"[HP constraints] Some heat pump carriers not found for {country}: {missing_carriers}")
 
-                logging.info(f"[HP constraints] Fixed '{link_name}' ({hp_carrier}): "
-                             f"p_nom={per_link_capacity:.2f} MW (non-extendable)")
+        # Check if we have fixed capacities (min == max)
+        fixed_capacities = all(
+            caps.get("min", 0) == caps.get("max", 0)
+            for caps in year_dict.values()
+            if "min" in caps and "max" in caps
+        )
+
+        # Track country-specific totals
+        country_min = 0
+        country_max = 0
+        country_links = 0
+
+        # Apply constraints to each carrier
+        for hp_carrier, caps in year_dict.items():
+            min_cap = caps.get("min", 0)
+            max_cap = caps.get("max", float('inf'))
+
+            # Find relevant links in this country
+            relevant_links = n.links.index[
+                (n.links.carrier == hp_carrier) &
+                (n.links.bus1.isin(country_buses))
+                ]
+
+            if len(relevant_links) == 0:
+                logging.info(f"[HP constraints] No {hp_carrier} found in {country}")
+                continue  # Skip this carrier and continue with the next one
+
+            # Apply constraints to each link
+            for link_name in relevant_links:
+                per_link_capacity = min_cap / len(relevant_links)
+
+                if fixed_capacities or min_cap == max_cap:
+                    # Fixed capacity
+                    n.links.at[link_name, "p_nom"] = per_link_capacity
+                    n.links.at[link_name, "p_nom_extendable"] = False
+                else:
+                    # Min/max capacity
+                    n.links.at[link_name, "p_nom_extendable"] = True
+                    n.links.at[link_name, "p_nom_min"] = per_link_capacity
+                    n.links.at[link_name, "p_nom_max"] = max_cap / len(relevant_links)
+
+                country_links += 1
+                total_links_constrained += 1
+
+            country_min += min_cap
+            country_max += max_cap
+
+        # Log country summary
+        if country_links > 0:
+            if fixed_capacities:
+                logging.info(
+                    f"[HP constraints] {country}: Applied fixed capacity to {country_links} links, total: {country_min} MW")
             else:
-                # For flexible years, set min/max and make extendable
-                n.links.at[link_name, "p_nom_extendable"] = True
-                n.links.at[link_name, "p_nom_min"] = per_link_capacity
-                n.links.at[link_name, "p_nom_max"] = max_cap / len(relevant_links)
+                logging.info(
+                    f"[HP constraints] {country}: Applied constraints to {country_links} links, range: {country_min}-{country_max} MW")
+            countries_processed += 1
 
-                logging.info(f"[HP constraints] Set '{link_name}' ({hp_carrier}): "
-                             f"p_nom_min={per_link_capacity:.2f} MW, "
-                             f"p_nom_max={(max_cap / len(relevant_links)):.2f} MW")
-
-            applied_constraints = True
-            total_links += 1
-
-        total_min += min_cap
-        total_max += max_cap
-
-    # Log summary
-    if applied_constraints:
-        if is_fixed_year:
-            logging.info(f"[HP constraints] Successfully applied fixed capacities to {total_links} heat pump links")
-            logging.info(f"[HP constraints] Total heat pump capacity for {year_str}: {total_min} MW")
-        else:
-            logging.info(f"[HP constraints] Successfully applied constraints to {total_links} heat pump links")
-            logging.info(f"[HP constraints] Total heat pump capacity range for {year_str}: {total_min}-{total_max} MW")
+    # Log overall summary
+    if total_links_constrained > 0:
+        logging.info(
+            f"[HP constraints] Successfully applied constraints to {total_links_constrained} heat pump links across {countries_processed} countries")
     else:
-        logging.warning(f"[HP constraints] No heat pump constraints were applied for {year_str}")
+        logging.warning(f"[HP constraints] No heat pump constraints were applied")
 
     logging.info("[HP constraints] Completed heat pump constraint application")
 
 
-def add_dsm(n, config):
+def add_dsm(n, config=None):
     """
-    Add demand-side management (DSM) components to the network using the approach
-    from the paper 'Impact of Flexible Demand-Side Management in Open Energy System
-    Models'.
+    Add demand-side management (DSM) components to the network.
+    Enhanced version with improved parameters and flexibility options.
     """
     import logging
     import pandas as pd
@@ -1406,18 +1482,60 @@ def add_dsm(n, config):
     logger.info("\n=== Starting Enhanced DSM Addition ===")
 
     try:
-        # Verify config structure
-        if 'sector' not in config:
-            raise KeyError("'sector' not found in config")
-        if 'dsm' not in config['sector']:
-            raise KeyError("'dsm' not found in sector config")
+        # Handle the config parameter
+        if config is None:
+            # Try to get config from network or snakemake
+            if hasattr(n, 'config'):
+                config = n.config
+                logger.info("Using config from network object")
+            else:
+                try:
+                    # Try to get config from snakemake
+                    config = snakemake.config
+                    logger.info("Got config from snakemake")
+                except (NameError, AttributeError):
+                    logger.warning("No config found, using default DSM parameters")
+                    config = {}
 
-        dsm_config = config['sector']['dsm']
-        logger.info(f"Working with DSM config: {dsm_config}")
+        # Store the config in the network for reference
+        n.config = config
 
+        # Check if DSM is enabled in config - look for it under sector.dsm
+        dsm_config = config.get('sector', {}).get('dsm', {})
         if not dsm_config.get('enable', False):
             logger.info("DSM is disabled in config. Skipping.")
             return n
+
+        # Get active scenario configuration
+        active_scenario = dsm_config.get('active_scenario', 'medium')
+        logger.info(f"Using {active_scenario} DSM scenario from config")
+
+        # Get scenario configuration
+        scenario_config = dsm_config.get('scenarios', {}).get(active_scenario, {})
+        if not scenario_config:
+            logger.warning(f"No configuration found for {active_scenario} scenario. Using default parameters.")
+            scenario_config = {
+                "default": {
+                    "tech_potential": 0.1,
+                    "time_shifting": 6,
+                    "costs": {
+                        "2030": {"capital_cost": 30, "storage_cost": 3, "marginal_cost": 0.1}
+                    },
+                    "demand_types": {
+                        "electricity": {"sflex_modifier": 1.0, "time_window_modifier": 1.0},
+                        "industry_electricity": {"sflex_modifier": 1.2, "time_window_modifier": 0.8}
+                    }
+                }
+            }
+
+        # Get countries to apply DSM to
+        countries_to_process = dsm_config.get('countries', [])
+        if not countries_to_process:
+            # If empty, apply to all countries in the network
+            countries_to_process = n.buses.country.unique().tolist()
+            logger.info(f"Applying DSM to all countries in network: {countries_to_process}")
+        else:
+            logger.info(f"Applying DSM to specified countries: {countries_to_process}")
 
         # Get planning year
         try:
@@ -1427,59 +1545,17 @@ def add_dsm(n, config):
             if hasattr(n, 'planning_year'):
                 year = n.planning_year
             else:
-                year = 2030  # Default
+                # Try to extract year from network name or attributes
+                year = "2030"  # Default
+                if hasattr(n, 'name'):
+                    import re
+                    match = re.search(r'(\d{4})', n.name)
+                    if match:
+                        year = match.group(1)
             logger.info(f"Using planning year: {year}")
 
-        # Define DSM parameters for different demand types
-        dsm_params = {
-            'electricity': {
-                'sflex': dsm_config.get("tech_potential", 0.1),  # Flexible share of load
-                'sutil': 0.67,  # Utilization factor from paper
-                'sinc': 1.0,  # Maximum increase factor
-                'sdec': 0.5,  # Minimum decrease factor
-                'delta_t': dsm_config.get("time_shifting", 6)  # Shifting window in hours
-            },
-            'industry electricity': {
-                'sflex': min(dsm_config.get("tech_potential", 0.1) * 1.2, 0.6),  # Higher flexibility for industry
-                'sutil': 0.8,  # Higher utilization for industry
-                'sinc': 0.95,  # From paper for industrial processes
-                'sdec': 0.0,  # From paper for industrial processes
-                'delta_t': max(dsm_config.get("time_shifting", 6) - 2, 4)  # Shorter window for industry
-            },
-            'agriculture electricity': {
-                'sflex': min(dsm_config.get("tech_potential", 0.1) * 0.8, 0.4),  # Lower flexibility
-                'sutil': 0.7,  # Standard utilization
-                'sinc': 0.9,  # Can increase load significantly
-                'sdec': 0.5,  # Can decrease load by half
-                'delta_t': dsm_config.get("time_shifting", 6) * 2  # Longer shifting window
-            }
-        }
-
-        # Add general electric transport
-        if len(n.loads[n.loads.carrier == 'land transport EV']) > 0:
-            dsm_params['land transport EV'] = {
-                'sflex': min(dsm_config.get("tech_potential", 0.1) * 1.5, 0.75),  # Higher flexibility for EVs
-                'sutil': 0.6,  # Lower utilization for EV charging
-                'sinc': 1.0,  # Can fully increase charging
-                'sdec': 0.0,  # Can fully decrease charging
-                'delta_t': dsm_config.get("time_shifting", 6) * 2  # Longer shifting window for EVs
-            }
-
-        # Get DSM costs
-        dsm_costs = dsm_config.get("costs", {})
-        if str(year) in dsm_costs:
-            costs = dsm_costs[str(year)]
-        elif int(year) in dsm_costs:
-            costs = dsm_costs[int(year)]
-        else:
-            logger.warning(f"No cost data found for year {year} in config; using default cost values.")
-            costs = {"capital_cost": 80, "storage_cost": 8}
-
-        # Handle missing storage_cost value for 2045
-        if 'storage_cost' not in costs or costs['storage_cost'] is None:
-            costs['storage_cost'] = 4  # Default value
-
-        logger.info(f"DSM cost data for year {year} used: {costs}")
+        # Store planning year for later use
+        n.planning_year = year
 
         # Add DSM carrier if it doesn't exist
         dsm_carrier = "dsm"
@@ -1487,192 +1563,570 @@ def add_dsm(n, config):
             n.add("Carrier", dsm_carrier)
             logger.info(f"Added DSM carrier: {dsm_carrier}")
 
-        # Define function to process DSM for each load
-        def process_dsm_for_load(load_name, load, params):
-            """Create DSM components for a specific load using paper's methodology"""
-            try:
-                logger.info(f"Creating DSM for load: {load_name} (carrier: {load.carrier})")
+        # Track totals for summary
+        total_dsm = {'power': 0, 'energy': 0, 'components': 0}
+        countries_processed = 0
 
-                # Get load time series
-                if hasattr(n, 'loads_t') and hasattr(n.loads_t, 'p_set'):
-                    load_ts = n.loads_t.p_set[load_name]
-                else:
-                    logger.warning(f"No time series for load {load_name}. Using static value.")
-                    # Create synthetic time series if none exists
-                    load_ts = pd.Series(
-                        data=load.p_set,
-                        index=n.snapshots
-                    )
+        # Prepare storage for initial values if they don't exist
+        if 'e_initial' not in n.stores_t:
+            n.stores_t['e_initial'] = pd.Series(index=n.stores.index)
 
-                # Extract DSM parameters for this load type
-                sflex = params['sflex']
-                sutil = params['sutil']
-                sinc = params['sinc']
-                sdec = params['sdec']
-                delta_t = params['delta_t']
-
-                # Step 1: Calculate shiftable load L(t)
-                scheduled_load = load_ts * sflex
-
-                # Step 2: Calculate maximum capacity Lambda
-                energy_annual = load_ts.sum()
-                hours_year = len(load_ts) if len(load_ts) > 0 else 8760
-                lam = (energy_annual * sflex) / (hours_year * sutil)
-
-                # Skip if lambda is too small
-                if lam < 1e-3:  # Very small value - not worth modeling
-                    logger.info(f"Lambda for {load_name} is too small ({lam:.5f} MW). Skipping.")
-                    return {'power': 0, 'energy': 0}
-
-                # CRITICAL FIX: Set reasonable bounds for time-series constraints
-                # We'll avoid strict limits that could lead to infeasibilities
-
-                # Create DSM components
-                bus_name = load.bus
-                dsm_bus_name = f"{bus_name} DSM"
-
-                # Create DSM bus if it doesn't exist
-                if dsm_bus_name not in n.buses.index:
-                    n.add("Bus",
-                          dsm_bus_name,
-                          carrier=dsm_carrier,
-                          location=bus_name)
-
-                # Create DSM link - using reasonable fixed values
-                link_name = f"{load_name} DSM"
-                max_power = lam * sinc * 2  # Maximum power capacity
-
-                n.add("Link",
-                      link_name,
-                      bus0=dsm_bus_name,
-                      bus1=bus_name,
-                      carrier=dsm_carrier,
-                      p_nom=max_power,  # Set fixed capacity based on calculations
-                      p_nom_extendable=False,
-                      efficiency=1.0,
-                      marginal_cost=costs.get("marginal_cost", 1.0))  # Small cost
-
-                # Create DSM store with reasonable capacity
-                store_name = f"{bus_name} DSM store"
-                max_energy = lam * delta_t * 2  # Maximum energy capacity
-
-                if store_name not in n.stores.index:  # Create store per bus, not per load
-                    n.add("Store",
-                          store_name,
-                          bus=dsm_bus_name,
-                          carrier=dsm_carrier,
-                          e_nom=max_energy,  # Set energy capacity based on time window
-                          e_nom_extendable=False,
-                          e_cyclic=True,
-                          standing_loss=0.0)
-
-                # CRITICAL FIX: Instead of using precise p_max_pu/p_min_pu values that might
-                # lead to infeasibilities, we'll use simplified time series constraints
-
-                # Create simpler, more relaxed time-series constraints
-                if 'p_max_pu' not in n.links_t:
-                    n.links_t.p_max_pu = pd.DataFrame(index=n.snapshots)
-                if 'p_min_pu' not in n.links_t:
-                    n.links_t.p_min_pu = pd.DataFrame(index=n.snapshots)
-
-                # Use constant values (fully available) instead of calculated ones
-                n.links_t.p_max_pu[link_name] = 1.0  # Full upward flexibility
-                n.links_t.p_min_pu[link_name] = -1.0  # Full downward flexibility
-
-                # DO NOT set store e_max_pu and e_min_pu - they cause the infeasibility
-                # Let the solver determine these values within the physical capacity
-
-                logger.info(f"Created DSM components for {load_name}:")
-                logger.info(f"  - Lambda: {lam:.2f} MW")
-                logger.info(f"  - DSM power capacity: {max_power:.2f} MW")
-                logger.info(f"  - DSM energy capacity: {max_energy:.2f} MWh")
-                logger.info(f"  - Time window: {delta_t} hours")
-
-                return {
-                    'power': max_power,
-                    'energy': max_energy
-                }
-
-            except Exception as e:
-                logger.error(f"Error creating DSM for load {load_name}: {str(e)}")
-                logger.error("Traceback:", exc_info=True)
-                return {'power': 0, 'energy': 0}
-
-        # Process each electricity demand type with its specific parameters
-        dsm_totals = {'power': 0, 'energy': 0, 'components': 0}
-
-        # Process loads by carrier type
-        for carrier, params in dsm_params.items():
-            # Find loads of this carrier type
-            carrier_loads = n.loads[n.loads.carrier == carrier]
-            if len(carrier_loads) == 0:
-                logger.info(f"No loads found for carrier: {carrier}")
+        # Process each country
+        for country in countries_to_process:
+            # Get country-specific config or fall back to default
+            country_config = scenario_config.get(country, scenario_config.get('default', {}))
+            if not country_config:
+                logger.warning(f"No DSM configuration found for {country}. Skipping.")
                 continue
 
-            logger.info(f"\nProcessing {len(carrier_loads)} loads for carrier: {carrier}")
-            logger.info(f"Parameters: sflex={params['sflex']}, delta_t={params['delta_t']} hours")
+            # Get country-specific parameters
+            tech_potential = country_config.get('tech_potential', 0.1)
+            time_shifting = country_config.get('time_shifting', 6)
+            demand_type_modifiers = country_config.get('demand_types', {})
 
-            # Process each load of this type
-            for load_name, load in carrier_loads.iterrows():
-                result = process_dsm_for_load(load_name, load, params)
-                dsm_totals['power'] += result['power']
-                dsm_totals['energy'] += result['energy']
-                if result['power'] > 0:
-                    dsm_totals['components'] += 1
+            # Get country-specific costs for this year
+            costs_config = country_config.get('costs', {})
+            if str(year) in costs_config:
+                costs = costs_config[str(year)]
+            elif int(year) in costs_config:
+                costs = costs_config[int(year)]
+            else:
+                logger.warning(f"No cost data found for {country} in year {year}; using default cost values.")
+                # Improved default cost values
+                costs = {"capital_cost": 20, "storage_cost": 1, "marginal_cost": 0.05}
 
-        # Final DSM summary
-        logger.info("\n=== DSM Addition Summary ===")
-        logger.info(f"Total DSM components added: {dsm_totals['components']}")
-        logger.info(f"Total DSM power capacity: {dsm_totals['power']:.2f} MW")
-        logger.info(f"Total DSM energy capacity: {dsm_totals['energy']:.2f} MWh")
+            logger.info(f"\n--- Processing DSM for {country} ---")
+            logger.info(f"Base tech_potential: {tech_potential}, time_shifting: {time_shifting}")
+            logger.info(f"Cost data for year {year}: {costs}")
 
-        # Verify components were added
-        dsm_buses = n.buses[n.buses.carrier == dsm_carrier]
-        dsm_links = n.links[n.links.carrier == dsm_carrier]
-        dsm_stores = n.stores[n.stores.carrier == dsm_carrier]
+            # Get buses for this country
+            country_buses = n.buses.index[n.buses.country == country]
+            if country_buses.empty:
+                logger.warning(f"Found no buses for {country}. Skipping.")
+                continue
 
-        logger.info("\nDSM Components Added:")
-        logger.info(f"  - DSM Buses: {len(dsm_buses)}")
-        logger.info(f"  - DSM Links: {len(dsm_links)}")
-        logger.info(f"  - DSM Stores: {len(dsm_stores)}")
+            # Define DSM parameters for different demand types in this country
+            dsm_params = {}
+
+            # Add electricity as base type
+            dsm_params['electricity'] = {
+                'sflex': tech_potential *
+                         demand_type_modifiers.get('electricity', {}).get('sflex_modifier', 1.0),
+                'sutil': 0.5,  # Lower utilization factor to allow more capacity
+                'sinc': 1.2,  # Increased maximum increase factor
+                'sdec': 0.7,  # Improved minimum decrease factor
+                'delta_t': int(time_shifting *
+                               demand_type_modifiers.get('electricity', {}).get('time_window_modifier', 1.0))
+            }
+
+            # Add industry electricity if present
+            if 'industry_electricity' in demand_type_modifiers:
+                dsm_params['industry electricity'] = {
+                    'sflex': min(tech_potential *
+                                 demand_type_modifiers.get('industry_electricity', {}).get('sflex_modifier', 1.2), 0.8),
+                    # Higher limit
+                    'sutil': 0.6,  # Improved utilization for industry
+                    'sinc': 1.1,  # More balanced for industrial processes
+                    'sdec': 0.3,  # More balanced for industrial processes
+                    'delta_t': int(max(time_shifting *
+                                       demand_type_modifiers.get('industry_electricity', {}).get('time_window_modifier',
+                                                                                                 0.8), 6))
+                    # Minimum 6 hours
+                }
+
+            # Add other demand types that have modifiers defined
+            for type_key, modifiers in demand_type_modifiers.items():
+                carrier = type_key.replace('_', ' ')
+                if carrier != 'electricity' and carrier != 'industry electricity' and carrier not in dsm_params:
+                    # Default parameters with modifiers applied
+                    dsm_params[carrier] = {
+                        'sflex': min(tech_potential * modifiers.get('sflex_modifier', 1.0), 0.7),  # Higher limit
+                        'sutil': 0.55,  # Improved utilization
+                        'sinc': 1.1,  # Improved increase factor
+                        'sdec': 0.4,  # Improved decrease factor
+                        'delta_t': int(max(time_shifting * modifiers.get('time_window_modifier', 1.0), 4))
+                        # Minimum 4 hours
+                    }
+
+            # Check if EV DSM is already handled in the model
+            ev_dsm_already_handled = False
+            if 'transport' in config and 'bev_dsm' in config['transport']:
+                try:
+                    bev_dsm_year = int(config['transport']['bev_dsm'])
+                    current_year = int(year)
+                    if current_year >= bev_dsm_year:
+                        ev_dsm_already_handled = True
+                        logger.info(f"EV DSM is already handled by the transport model since {bev_dsm_year}")
+                except (ValueError, TypeError):
+                    logger.warning("Could not parse bev_dsm year from config")
+
+            # Remove EV transport if already handled
+            if ev_dsm_already_handled and 'land transport EV' in dsm_params:
+                del dsm_params['land transport EV']
+                logger.info("Skipping DSM for EV transport as it's already handled by the transport model")
+
+            # Log the country-specific DSM parameters
+            for carrier, params in dsm_params.items():
+                logger.info(f"DSM parameters for {country} - {carrier}:")
+                logger.info(f"  - sflex: {params['sflex']:.2f}")
+                logger.info(f"  - delta_t: {params['delta_t']} hours")
+                logger.info(f"  - sutil: {params['sutil']:.2f}")
+                logger.info(f"  - sinc: {params['sinc']:.2f}")
+                logger.info(f"  - sdec: {params['sdec']:.2f}")
+
+            # Define function to process DSM for each load
+            def process_dsm_for_load(load_name, load, params):
+                """Create improved DSM components for a specific load"""
+                try:
+                    logger.info(f"Creating DSM for load: {load_name} (carrier: {load.carrier})")
+
+                    # Get load time series
+                    if hasattr(n, 'loads_t') and hasattr(n.loads_t, 'p_set'):
+                        load_ts = n.loads_t.p_set[load_name]
+                    else:
+                        logger.warning(f"No time series for load {load_name}. Using static value.")
+                        # Create synthetic time series if none exists
+                        load_ts = pd.Series(
+                            data=load.p_set,
+                            index=n.snapshots
+                        )
+
+                    # Extract DSM parameters for this load type
+                    sflex = params['sflex']
+                    sutil = params['sutil']
+                    sinc = params['sinc']
+                    sdec = params['sdec']
+                    delta_t = params['delta_t']
+
+                    # Step 1: Calculate shiftable load L(t)
+                    scheduled_load = load_ts * sflex
+
+                    # Step 2: Calculate maximum capacity Lambda - IMPROVED CALCULATION
+                    energy_annual = load_ts.sum()
+                    hours_year = len(load_ts) if len(load_ts) > 0 else 8760
+
+                    # More generous lambda calculation
+                    lam = (energy_annual * sflex) / (hours_year * sutil * 0.5)
+
+                    # Skip if lambda is too small
+                    if lam < 1e-3:  # Very small value - not worth modeling
+                        logger.info(f"Lambda for {load_name} is too small ({lam:.5f} MW). Skipping.")
+                        return {'power': 0, 'energy': 0}
+
+                    # Create DSM components
+                    bus_name = load.bus
+                    dsm_bus_name = f"{bus_name} DSM"
+
+                    # Create DSM bus if it doesn't exist
+                    if dsm_bus_name not in n.buses.index:
+                        n.add("Bus",
+                              dsm_bus_name,
+                              carrier=dsm_carrier,
+                              location=bus_name)
+
+                    # Create DSM link with improved parameters
+                    link_name = f"{load_name} DSM"
+                    max_power = lam * sinc * 2  # More generous maximum power capacity
+
+                    n.add("Link",
+                          link_name,
+                          bus0=dsm_bus_name,
+                          bus1=bus_name,
+                          carrier=dsm_carrier,
+                          p_nom=max_power,
+                          p_nom_extendable=False,
+                          efficiency=1.0,
+                          marginal_cost=costs.get("marginal_cost", 0.1),  # Lower marginal cost
+                          capital_cost=costs.get("capital_cost", 20))  # Include capital cost
+
+                    # Create DSM store with improved parameters
+                    store_name = f"{bus_name} DSM store"
+                    max_energy = lam * delta_t * 2  # Base energy capacity calculation
+
+                    if store_name not in n.stores.index:  # Create store per bus, not per load
+                        n.add("Store",
+                              store_name,
+                              bus=dsm_bus_name,
+                              carrier=dsm_carrier,
+                              e_nom=max_energy,  # Base capacity
+                              e_nom_extendable=True,  # Allow optimization
+                              e_nom_min=max_energy * 0.5,  # Minimum capacity
+                              e_nom_max=max_energy * 4,  # Maximum capacity
+                              e_cyclic=False,  # Don't force cyclicity over full period
+                              standing_loss=0.001,  # Small standing loss
+                              capital_cost=costs.get("storage_cost", 1))  # Storage cost
+
+                        # Set initial state of charge to 50%
+                        n.stores_t.e_initial[store_name] = max_energy * 0.5
+
+                    # Create time-series constraints with load-based variation
+                    if 'p_max_pu' not in n.links_t:
+                        n.links_t.p_max_pu = pd.DataFrame(index=n.snapshots)
+                    if 'p_min_pu' not in n.links_t:
+                        n.links_t.p_min_pu = pd.DataFrame(index=n.snapshots)
+
+                    # Create time-varying flexibility that matches load patterns
+                    normalized_load = load_ts / load_ts.max()
+                    n.links_t.p_max_pu[link_name] = 1.0 + 0.5 * normalized_load  # Higher during peak demand
+                    n.links_t.p_min_pu[link_name] = -1.0 - 0.5 * normalized_load  # Higher during peak demand
+
+                    logger.info(f"Created DSM components for {load_name}:")
+                    logger.info(f"  - Lambda: {lam:.2f} MW")
+                    logger.info(f"  - DSM power capacity: {max_power:.2f} MW")
+                    logger.info(f"  - DSM base energy capacity: {max_energy:.2f} MWh")
+                    logger.info(f"  - DSM capacity range: {max_energy * 0.5:.2f} - {max_energy * 4:.2f} MWh")
+
+                    return {
+                        'power': max_power,
+                        'energy': max_energy
+                    }
+
+                except Exception as e:
+                    logger.error(f"Error creating DSM for load {load_name}: {str(e)}")
+                    logger.error("Traceback:", exc_info=True)
+                    return {'power': 0, 'energy': 0}
+
+            # Country-specific totals
+            country_dsm = {'power': 0, 'energy': 0, 'components': 0}
+
+            # Process loads by carrier type for this country
+            for carrier, params in dsm_params.items():
+                # Find loads of this carrier type in this country
+                carrier_loads = n.loads[
+                    (n.loads.carrier == carrier) &
+                    (n.loads.bus.isin(country_buses))
+                    ]
+
+                if len(carrier_loads) == 0:
+                    logger.info(f"No loads found for carrier: {carrier} in {country}")
+                    continue
+
+                logger.info(f"\nProcessing {len(carrier_loads)} loads for {carrier} in {country}")
+
+                # Process each load of this type
+                for load_name, load in carrier_loads.iterrows():
+                    result = process_dsm_for_load(load_name, load, params)
+                    country_dsm['power'] += result['power']
+                    country_dsm['energy'] += result['energy']
+                    if result['power'] > 0:
+                        country_dsm['components'] += 1
+
+            # Country summary
+            if country_dsm['components'] > 0:
+                logger.info(f"\n--- DSM Summary for {country} ---")
+                logger.info(f"DSM components added: {country_dsm['components']}")
+                logger.info(f"Total DSM power capacity: {country_dsm['power']:.2f} MW")
+                logger.info(f"Total DSM energy capacity: {country_dsm['energy']:.2f} MWh")
+                countries_processed += 1
+
+                # Add to overall totals
+                total_dsm['power'] += country_dsm['power']
+                total_dsm['energy'] += country_dsm['energy']
+                total_dsm['components'] += country_dsm['components']
+
+        # Final overall DSM summary
+        logger.info("\n=== Overall Enhanced DSM Addition Summary ===")
+        logger.info(f"Countries processed: {countries_processed}")
+        logger.info(f"Total DSM components added: {total_dsm['components']}")
+        logger.info(f"Total DSM power capacity: {total_dsm['power']:.2f} MW")
+        logger.info(f"Total DSM energy capacity: {total_dsm['energy']:.2f} MWh")
+
+        # Store minimum utilization in network for constraints
+        n.dsm_minimum_utilization = dsm_config.get('minimum_utilization', 0.0)
+        if n.dsm_minimum_utilization > 0:
+            logger.info(f"Set minimum DSM utilization to {n.dsm_minimum_utilization * 100:.1f}% of demand")
 
     except Exception as e:
         logger.error(f"Error in add_dsm: {str(e)}")
         logger.error("Traceback:", exc_info=True)
-        raise
+        import traceback
+        traceback.print_exc()
 
     return n
 
 
 def add_dsm_constraints(n, snapshots):
     """
-    Add DSM-specific constraints to the optimization problem if needed.
-    With e_cyclic=True, PyPSA should already ensure energy neutrality.
-    This function is kept for compatibility or additional constraints.
+    Add enhanced DSM-specific constraints to the optimization problem.
+    - Adds daily energy neutrality constraints
+    - Supports minimum utilization
+    - Adds optional ramping limits
+    """
+    import logging
+    import pandas as pd
+    import numpy as np
+    from datetime import timedelta
+
+    logger = logging.getLogger(__name__)
+    logger.info("Adding enhanced DSM constraints")
+
+    # Check if DSM is enabled in the model
+    dsm_links = n.links[n.links.carrier == "dsm"]
+    dsm_stores = n.stores[n.stores.carrier == "dsm"]
+
+    if len(dsm_links) == 0 and len(dsm_stores) == 0:
+        logger.info("No DSM components found in the network. Skipping constraints.")
+        return
+
+    logger.info(f"Found {len(dsm_links)} DSM links and {len(dsm_stores)} DSM stores")
+
+    # 1. Add daily energy neutrality constraints (if not using e_cyclic)
+    links_by_bus = {}
+    for link_name, link in dsm_links.iterrows():
+        if link.bus1 not in links_by_bus:
+            links_by_bus[link.bus1] = []
+        links_by_bus[link.bus1].append(link_name)
+
+    # Group snapshots by day
+    daily_groups = {}
+    if isinstance(snapshots[0], pd.Timestamp):
+        # Group timestamps by day
+        for i, s in enumerate(snapshots):
+            day = s.date()
+            if day not in daily_groups:
+                daily_groups[day] = []
+            daily_groups[day].append(i)
+    else:
+        # If not timestamps, create artificial days of 24 periods each
+        period_length = 24  # Assuming 24 hours per day
+        for i in range(0, len(snapshots), period_length):
+            day_index = i // period_length
+            end_idx = min(i + period_length, len(snapshots))
+            daily_groups[f"day_{day_index}"] = list(range(i, end_idx))
+
+    # Add daily neutrality constraints for each store
+    for store_name, store in dsm_stores.iterrows():
+        bus = store.bus
+        links = []
+        # Find links connected to this DSM bus
+        for link_name, link in dsm_links.iterrows():
+            if link.bus0 == bus:
+                links.append({"name": link_name, "direction": "outflow"})
+            elif link.bus1 == bus:
+                links.append({"name": link_name, "direction": "inflow"})
+
+        if not links:
+            continue
+
+        # Add daily energy neutrality constraints
+        for day, day_indices in daily_groups.items():
+            if len(day_indices) < 2:
+                continue  # Skip if less than 2 periods in the day
+
+            # Create expression for net energy flow in this day
+            day_expr = 0
+            for link in links:
+                for t in day_indices:
+                    if link["direction"] == "outflow":
+                        # Energy leaving the store (negative impact)
+                        day_expr -= n.model.variables[f"Link-p-{link['name']}"][t]
+                    else:
+                        # Energy entering the store (positive impact)
+                        day_expr += n.model.variables[f"Link-p-{link['name']}"][t]
+
+            # Allow small tolerance (0.5% of store capacity)
+            tolerance = store.e_nom_opt if hasattr(store, 'e_nom_opt') else store.e_nom
+            tolerance *= 0.005  # 0.5% tolerance
+
+            # Add neutrality constraints
+            n.model.addConstr(day_expr >= -tolerance, name=f"dsm_daily_min_{store_name}_{day}")
+            n.model.addConstr(day_expr <= tolerance, name=f"dsm_daily_max_{store_name}_{day}")
+
+    # 2. Add minimum utilization constraint if configured
+    min_utilization = getattr(n, 'dsm_minimum_utilization', 0.0)
+
+    if min_utilization > 0:
+        logger.info(f"Adding minimum DSM utilization constraint: {min_utilization}")
+
+        # Create a dictionary to track DSM activity by bus
+        dsm_by_bus = {}
+        for link_name, link in dsm_links.iterrows():
+            bus_name = link.bus1  # The main grid bus
+            if bus_name not in dsm_by_bus:
+                dsm_by_bus[bus_name] = []
+            dsm_by_bus[bus_name].append(link_name)
+
+        # Add constraint for each bus with DSM
+        for bus_name, link_names in dsm_by_bus.items():
+            # Get total demand at this bus
+            bus_loads = n.loads[n.loads.bus == bus_name]
+            total_demand = 0
+
+            for load_name, load in bus_loads.iterrows():
+                # Get load time series
+                if hasattr(n, 'loads_t') and hasattr(n.loads_t, 'p_set'):
+                    load_ts = n.loads_t.p_set[load_name].sum()
+                else:
+                    load_ts = load.p_set * len(snapshots)
+                total_demand += load_ts
+
+            if total_demand > 0:
+                # Calculate required minimum DSM activity
+                min_dsm_activity = total_demand * min_utilization
+
+                # Create auxiliary variables for absolute values
+                abs_vars = []
+                for link_name in link_names:
+                    for t in range(len(snapshots)):
+                        var_name = f"dsm_abs_{link_name}_{t}"
+                        up_var = n.model.addVar(lb=0, name=f"{var_name}_up")
+                        down_var = n.model.addVar(lb=0, name=f"{var_name}_down")
+
+                        # Link to the DSM variable
+                        dsm_var = n.model.variables[f"Link-p-{link_name}"][t]
+
+                        # Add constraints to compute absolute value
+                        n.model.addConstr(up_var >= dsm_var)
+                        n.model.addConstr(down_var >= -dsm_var)
+
+                        # Add both directions to track absolute value
+                        abs_vars.append(up_var + down_var)
+
+                # Add the minimum utilization constraint - sum of all absolute values
+                if abs_vars:
+                    abs_sum = sum(abs_vars)
+                    n.model.addConstr(abs_sum >= min_dsm_activity, name=f"min_dsm_{bus_name}")
+                    logger.info(
+                        f"Added minimum DSM utilization constraint for bus {bus_name}: {min_dsm_activity:.2f} MWh")
+
+    # 3. Add ramping constraints if configured
+    if hasattr(n, 'config'):
+        dsm_constraint_config = n.config.get('sector', {}).get('dsm', {}).get('constraints', {})
+
+        # Add DSM ramping restrictions if configured
+        if dsm_constraint_config.get('ramping_limit', {}).get('enable', False):
+            logger.info("Adding ramping restrictions for DSM")
+            ramp_limit = dsm_constraint_config.get('ramping_limit', {}).get('value', 0.5)
+
+            for link_name in dsm_links.index:
+                capacity = dsm_links.at[link_name, 'p_nom']
+                max_ramp = capacity * ramp_limit
+
+                for t in range(1, len(snapshots)):
+                    # Add constraint limiting ramp rate between consecutive time steps
+                    prev_var = n.model.variables[f"Link-p-{link_name}"][t - 1]
+                    current_var = n.model.variables[f"Link-p-{link_name}"][t]
+
+                    # Add constraints: |current - prev| <= max_ramp
+                    n.model.addConstr(current_var - prev_var <= max_ramp)
+                    n.model.addConstr(prev_var - current_var <= max_ramp)
+
+            logger.info(f"Added ramping constraints with limit of {ramp_limit * 100}% of capacity")
+
+    logger.info("Finished adding enhanced DSM constraints")
+
+
+def analyze_dsm_usage(n):
+    """
+    Analyze and log DSM usage after optimization to diagnose any issues.
+    This should be called after the model has been solved.
     """
     import logging
     logger = logging.getLogger(__name__)
 
-    logger.info("Checking if additional DSM constraints are needed")
+    logger.info("\n=== DSM USAGE ANALYSIS ===")
 
-    # With e_cyclic=True, the energy neutrality constraint is already handled
-    # by PyPSA. This function is kept for potential future extensions.
+    # Check if network has been solved
+    if not hasattr(n, 'results') and not hasattr(n.links_t, 'p'):
+        logger.warning("Network hasn't been solved yet. No DSM usage to analyze.")
+        return
 
-    # Example: You could add additional constraints here if needed
-    # For example, forcing DSM links to be inactive during certain hours
-
+    # Get DSM links
     dsm_links = n.links[n.links.carrier == "dsm"]
-    if len(dsm_links) > 0:
-        logger.info(f"Found {len(dsm_links)} DSM links")
-        # Add custom constraints here if needed
 
-    dsm_stores = n.stores[n.stores.carrier == "dsm"]
-    if len(dsm_stores) > 0:
-        logger.info(f"Found {len(dsm_stores)} DSM stores")
-        # Add custom constraints here if needed
+    if len(dsm_links) == 0:
+        logger.info("No DSM links found in network.")
+        return
 
-    logger.info("No additional DSM constraints needed at this time")
+    logger.info(f"Analyzing DSM usage for {len(dsm_links)} links...")
 
+    # Analyze DSM activity
+    total_dsm_activity = 0
+    total_dsm_capacity = 0
+    active_links = 0
+
+    for link_name in dsm_links.index:
+        # Get the link's power timeseries
+        if link_name in n.links_t.p:
+            link_p = n.links_t.p[link_name]
+            capacity = dsm_links.at[link_name, 'p_nom']
+
+            # Calculate metrics
+            abs_activity = link_p.abs().sum()
+            max_activity = capacity * len(n.snapshots)
+            utilization_rate = abs_activity / max_activity if max_activity > 0 else 0
+
+            if abs_activity > 1e-6:  # If there's any significant activity
+                active_links += 1
+                logger.info(f"DSM Link {link_name}:")
+                logger.info(f"  - Absolute activity: {abs_activity:.2f} MWh")
+                logger.info(f"  - Capacity: {capacity:.2f} MW")
+                logger.info(f"  - Utilization rate: {utilization_rate * 100:.2f}%")
+
+                # Count positive and negative shifts
+                pos_shifts = link_p[link_p > 1e-6].sum()
+                neg_shifts = link_p[link_p < -1e-6].sum()
+                logger.info(f"  - Load increases: {pos_shifts:.2f} MWh")
+                logger.info(f"  - Load decreases: {neg_shifts:.2f} MWh")
+
+                total_dsm_activity += abs_activity
+                total_dsm_capacity += capacity
+
+    if active_links > 0:
+        logger.info(f"\nTotal DSM Summary:")
+        logger.info(f"  - Active DSM links: {active_links} out of {len(dsm_links)}")
+        logger.info(f"  - Total absolute DSM activity: {total_dsm_activity:.2f} MWh")
+        logger.info(f"  - Total DSM capacity: {total_dsm_capacity:.2f} MW")
+        logger.info(
+            f"  - Overall utilization rate: {(total_dsm_activity / (total_dsm_capacity * len(n.snapshots))) * 100:.2f}%")
+    else:
+        logger.warning("No DSM activity detected in any link!")
+
+        # Try to diagnose why
+        logger.info("Potential reasons for zero DSM usage:")
+
+        # Check costs vs. alternatives
+        battery_links = n.links[n.links.carrier.str.contains('battery', case=False)]
+        if len(battery_links) > 0:
+            avg_battery_cost = battery_links.capital_cost.mean() if 'capital_cost' in battery_links.columns else "N/A"
+            logger.info(f"  - Battery capital cost comparison: {avg_battery_cost}")
+
+        # Check if there's storage utilization in the model
+        if hasattr(n.stores_t, 'e'):
+            dsm_stores = n.stores[n.stores.carrier == "dsm"]
+            for store in dsm_stores.index:
+                if store in n.stores_t.e:
+                    store_ts = n.stores_t.e[store]
+                    if store_ts.max() - store_ts.min() > 1e-6:
+                        logger.info(f"  - DSM store {store} shows energy level changes but no link activity")
+
+        # Check for binding constraints
+        if hasattr(n, 'model') and hasattr(n.model, 'getConstrs'):
+            dsm_constraints = [c for c in n.model.getConstrs() if 'dsm' in c.ConstrName.lower()]
+            binding_constraints = []
+
+            for constr in dsm_constraints:
+                slack = n.model.getConstrByName(constr.ConstrName).getAttr("slack")
+                if abs(slack) < 1e-6:  # Binding constraint
+                    binding_constraints.append(constr.ConstrName)
+
+            if binding_constraints:
+                logger.info(f"  - Found {len(binding_constraints)} binding DSM constraints:")
+                for constr in binding_constraints[:5]:  # Show first 5
+                    logger.info(f"    * {constr}")
+
+        # Check if costs are configured correctly
+        dsm_config = n.config.get('sector', {}).get('dsm', {})
+        active_scenario = dsm_config.get('active_scenario', 'medium')
+        logger.info(f"  - Using DSM scenario: {active_scenario}")
+        scenario_costs = dsm_config.get('scenarios', {}).get(active_scenario, {}).get('DE', {}).get('costs', {})
+        year = n.planning_year if hasattr(n, 'planning_year') else "2030"
+        year_costs = scenario_costs.get(str(year), {})
+        logger.info(f"  - DSM costs for year {year}: {year_costs}")
+
+        # Check system characteristics
+        logger.info(f"  - System generation/load balance may not require DSM")
+        logger.info(f"  - Cheaper flexibility options like interconnection might be preferred")
 
 def extra_functionality(n, snapshots):
     """
@@ -1699,14 +2153,30 @@ def extra_functionality(n, snapshots):
     if constraints.get("CLL", False):
         add_CLL_constraints(n, config)
 
-    # Add DSM-specific constraints if needed
-    # (note: we're not adding DSM components here, just additional constraints if necessary)
+        # Add DSM-specific constraints if needed
+        # (note: we're not adding DSM components here, just additional constraints if necessary)
     if config["sector"].get("dsm", {}).get("enable", False):
         add_dsm_constraints(n, snapshots)
 
-    # Always add heat pump constraints (regardless of config setting)
-    logging.info("[Setup] Adding heat pump constraints")
-    add_heat_pump_constraints(n)
+        # Only add heat pump constraints if enabled in config
+    # Try multiple paths for heat pump configuration
+    hp_enabled = False
+    possible_paths = [
+        config.get('solving', {}).get('constraints', {}).get('heat_pumps', {}),
+        config.get('constraints', {}).get('heat_pumps', {}),
+        config.get('heat_pumps', {})
+    ]
+
+    for path_config in possible_paths:
+        if path_config.get('apply_constraints', False):
+            hp_enabled = True
+            break
+
+    if hp_enabled:
+        logging.info("[Setup] Adding heat pump constraints")
+        add_heat_pump_constraints(n)
+    else:
+        logging.info("[Setup] Heat pump constraints disabled in config, skipping")
 
     reserve = config["electricity"].get("operational_reserve", {})
     if reserve.get("activate"):
