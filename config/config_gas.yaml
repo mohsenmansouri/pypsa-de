@@ -284,21 +284,19 @@ costs:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
   dsm:
-    enable: false
-    active_scenario: "conservative"  # Using conservative scenario
-    minimum_utilization: 0.01        # Only 1% of demand uses DSM
+    enable: true
+    active_scenario: "conservative"  # Using super optimistic scenario
+    minimum_utilization: 0.07            # Force 7% DSM usage
 
-    # Only apply to certain countries
-    countries: [ "DE" ]
+    # Apply to all countries in the model
+    # countries: []  # Empty list means all countries
 
     constraints:
       time_restrictions:
-        enable: true
-        hours: [ 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]  # Restrict during business hours
-        factor: 0.5          # 50% capacity during restricted hours
+        enable: false          # No time restrictions
       ramping_limit:
         enable: true
-        value: 0.15          # 15% ramp limit (very conservative)
+        value: 0.5             # 50% ramp limit (generous)
 
     scenarios:
       conservative:

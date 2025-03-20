@@ -579,169 +579,419 @@ import logging
 
 def add_CLL_constraints(n, config):
     """
-    Add CLL constraints for coal, lignite, CCGT, and OCGT (implemented as links)
+    Add CLL constraints for conventional generators and CHP units (implemented as links)
     using planning_year from snakemake.wildcards.planning_horizons.
 
-    For each year, a dictionary defines min/max capacities.
+    Reads capacity targets from config.solving.constraints.CLL.generation_target_ranges.
     The function zeroes out existing capacities in DE and then adds or updates one link per carrier.
 
-    For gas-based carriers:
-      - For CCGT we now fix the capacity (p_nom_extendable=False) so that the solver is forced
-        to invest at least the minimum capacity.
-      - For OCGT the link remains extendable.
-
-    Make sure that the buses 'EU gas', 'EU coal', 'EU lignite', and 'DE0 0' exist in n.buses.
+    Make sure that the required buses exist in n.buses.
     """
     logging.info("====== STARTING CLL CONSTRAINTS FOR LINKS AND GENERATORS ======")
 
     try:
+        # Check if CLL constraints are enabled in config
+        cll_config = config.get("solving", {}).get("constraints", {}).get("CLL", {})
+
+        # If CLL config exists but apply_constraints is False, skip
+        if not cll_config.get("apply_constraints", False):
+            logging.info("CLL constraints are disabled in config. Skipping.")
+            return n
+
         # 1) Read planning year from snakemake wildcards
         planning_year = int(snakemake.wildcards.planning_horizons)
         de_buses = n.buses[n.buses.country == 'DE'].index
 
-        # 2) Capacity targets for each year
-        capacities = {
-            '2020': {
-                'coal': {'min': 20000, 'max': 20000},
-                'lignite': {'min': 20000, 'max': 20000},
-                'CCGT': {'min': 10000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            },
+        # 2) Read capacity targets from config
+        if 'generation_target_ranges' not in cll_config:
+            raise ValueError("Missing 'generation_target_ranges' in CLL config")
 
-            '2025': {
-                'coal': {'min': 17000, 'max': 17000},
-                'lignite': {'min': 17000, 'max': 17000},
-                'CCGT': {'min': 10000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            },
+        generation_targets = cll_config['generation_target_ranges']
 
-            '2030': {
-                'coal': {'min': 8000, 'max': 8000},
-                'lignite': {'min': 8000, 'max': 8000},
-                'CCGT': {'min': 39000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            },
+        if str(planning_year) not in generation_targets:
+            raise ValueError(f"No capacity targets defined for year {planning_year} in CLL.generation_target_ranges")
 
-            '2035': {
-                'coal': {'min': 2000, 'max': 2000},
-                'lignite': {'min': 2000, 'max': 2000},
-                'CCGT': {'min': 50000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            },
+        year_capacities = generation_targets[str(planning_year)]
 
-            '2040': {
-                'coal': {'min': 0, 'max': 0},
-                'lignite': {'min': 0, 'max': 0},
-                'CCGT': {'min': 52000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            },
-            '2045': {
-                'coal': {'min': 0, 'max': 0},
-                'lignite': {'min': 0, 'max': 0},
-                'CCGT': {'min': 51000, 'max': 80000},
-                'OCGT': {'min': 50, 'max': 5000}
-            }
-        }
+        # Define carriers that are likely implemented as AC links
+        ac_carriers = [
+            'coal', 'lignite', 'CCGT', 'OCGT',
+            'urban central gas CHP', 'urban central gas CHP CC',
+            'urban central solid biomass CHP', 'urban central solid biomass CHP CC'
+        ]
 
-        year_str = str(planning_year)
-        if year_str not in capacities:
-            raise ValueError(f"No capacity targets defined for year {year_str}")
+        # Get all target carriers from the config
+        target_carriers = list(year_capacities.keys())
 
-        year_capacities = capacities[year_str]
+        # Check if we have AC links in the network
+        has_ac_links = 'AC' in n.links.carrier.unique()
 
-        # 3) Zero out existing capacity in DE for the four carriers
-        for carrier in ['coal', 'lignite', 'CCGT', 'OCGT']:
+        # Look for carrier properties if available in config
+        carrier_properties = {}
+        if ('solving' in config and
+                'constraints' in config['solving'] and
+                'CLL' in config['solving']['constraints'] and
+                'carrier_properties' in config['solving']['constraints']['CLL']):
+            carrier_properties = config['solving']['constraints']['CLL']['carrier_properties']
+
+        for carrier in target_carriers:
             if carrier not in n.carriers.index:
                 logging.info(f"Defining missing carrier '{carrier}' in n.carriers.")
                 n.carriers.loc[carrier, "nice_name"] = carrier
 
-            existing_units = n.links.loc[
+            # Check for generators with this carrier
+            if carrier in ['biomass', 'solid biomass']:
+                # Check if there are generators with this carrier
+                existing_generators = n.generators.loc[
+                    (n.generators.carrier.isin(['biomass', 'solid biomass'])) &
+                    (n.generators.bus.isin(de_buses))
+                    ]
+                if not existing_generators.empty:
+                    logging.info(
+                        f"Zeroing capacity for {len(existing_generators)} existing {carrier} generator(s) in DE.")
+                    n.generators.loc[existing_generators.index, "p_nom"] = 0
+                    n.generators.loc[existing_generators.index, "p_nom_extendable"] = False
+                    n.generators.loc[existing_generators.index, "p_nom_min"] = 0
+                    n.generators.loc[existing_generators.index, "p_nom_max"] = 0
+
+            # Check for direct links with this carrier
+            existing_links = n.links.loc[
                 (n.links.carrier == carrier) &
                 (n.links.bus1.isin(de_buses))
                 ]
-            if not existing_units.empty:
-                logging.info(f"Zeroing capacity for {len(existing_units)} existing {carrier} link(s) in DE.")
-                n.links.loc[existing_units.index, "p_nom"] = 0
-                n.links.loc[existing_units.index, "p_nom_extendable"] = False
-                n.links.loc[existing_units.index, "p_nom_min"] = 0
-                n.links.loc[existing_units.index, "p_nom_max"] = 0
+            if not existing_links.empty:
+                logging.info(f"Zeroing capacity for {len(existing_links)} existing {carrier} link(s) in DE.")
+                n.links.loc[existing_links.index, "p_nom"] = 0
+                n.links.loc[existing_links.index, "p_nom_extendable"] = False
+                n.links.loc[existing_links.index, "p_nom_min"] = 0
+                n.links.loc[existing_links.index, "p_nom_max"] = 0
 
-        # 4) Add or update link for each carrier from the capacity dictionary
+            # Special handling for carriers that might be implemented as AC links
+            if has_ac_links and carrier in ac_carriers:
+                # Look for AC links where bus0 contains carrier name
+                ac_links_for_carrier = n.links.loc[
+                    (n.links.carrier == 'AC') &
+                    (n.links.bus1.isin(de_buses)) &
+                    (n.links.bus0.str.contains(carrier, case=False))
+                    ]
+
+                if not ac_links_for_carrier.empty:
+                    logging.info(f"Zeroing capacity for {len(ac_links_for_carrier)} AC links for {carrier} in DE.")
+                    n.links.loc[ac_links_for_carrier.index, "p_nom"] = 0
+                    n.links.loc[ac_links_for_carrier.index, "p_nom_extendable"] = False
+                    n.links.loc[ac_links_for_carrier.index, "p_nom_min"] = 0
+                    n.links.loc[ac_links_for_carrier.index, "p_nom_max"] = 0
+
+        # 4) Add or update for each carrier from the capacity dictionary
         for carrier, caps in year_capacities.items():
-            min_cap = caps['min']
-            max_cap = caps['max']
+            min_cap = caps.get('min', 0)
+            max_cap = caps.get('max', 0)
 
             if min_cap <= 0 and max_cap <= 0:
-                logging.info(f"{carrier.capitalize()} capacity in {year_str} is 0 MW - skipping link creation.")
+                logging.info(f"{carrier.capitalize()} capacity in {planning_year} is 0 MW - skipping creation.")
                 continue
 
-            new_unit = f"DE0 0 {carrier}-{planning_year}"
+            # For biomass, we could use either generators or links, check network structure
+            if carrier in ['biomass', 'solid biomass']:
+                # Check if biomass is modeled as generators or links in this network
+                biomass_generators = n.generators[
+                    (n.generators.carrier.isin(['biomass', 'solid biomass'])) &
+                    (n.generators.bus.isin(de_buses))
+                    ]
+                biomass_links = n.links[
+                    (n.links.carrier.isin(['biomass', 'solid biomass'])) &
+                    (n.links.bus1.isin(de_buses))
+                    ]
+
+                # If there are existing biomass generators, add a new generator
+                if len(biomass_generators) > 0 or len(biomass_links) == 0:
+                    # Biomass is modeled as a generator
+                    new_unit = f"DE0 biomass-{planning_year}"
+
+                    # Find an appropriate bus to connect to
+                    elec_buses = [bus for bus in de_buses if 'elec' in n.buses.at[bus, 'carrier']]
+                    target_bus = elec_buses[0] if elec_buses else "DE0 0"
+
+                    if target_bus not in n.buses.index:
+                        logging.warning(
+                            f"Bus '{target_bus}' not found in n.buses; generator might not connect properly.")
+
+                    # Add or update generator
+                    if new_unit in n.generators.index:
+                        n.generators.at[new_unit, 'p_nom'] = min_cap
+                        n.generators.at[new_unit, 'p_nom_min'] = min_cap
+                        n.generators.at[new_unit, 'p_nom_max'] = max_cap
+                        n.generators.at[new_unit, 'p_nom_extendable'] = (min_cap != max_cap)
+                        msg = "Updated"
+                    else:
+                        n.add(
+                            "Generator",
+                            new_unit,
+                            bus=target_bus,
+                            carrier='biomass',
+                            p_nom=min_cap,
+                            p_nom_min=min_cap,
+                            p_nom_max=max_cap,
+                            p_nom_extendable=(min_cap != max_cap),
+                            marginal_cost=80  # Example value, adjust as needed
+                        )
+                        msg = "Added"
+
+                    if min_cap == max_cap:
+                        logging.info(
+                            f"{msg} biomass generator with fixed capacity: {min_cap} MW for year {planning_year}")
+                    else:
+                        logging.info(
+                            f"{msg} biomass generator with capacity range: {min_cap}-{max_cap} MW for year {planning_year}")
+
+                    continue  # Skip the link creation for biomass
+
+                # If we reach here, continue with biomass as a link
+
+            # Determine if this carrier should be implemented as an AC link or direct link
+            should_use_ac = has_ac_links and carrier in ac_carriers
+
+            # Create a unit name based on whether we're using AC or direct link
+            if should_use_ac:
+                # For AC links, create a source and a link
+                source_name = f"DE0 {carrier}-{planning_year}"
+                link_name = f"DE0 AC-{carrier}-{planning_year}"
+            else:
+                # For direct links, just need one name
+                link_name = f"DE0 0 {carrier.replace(' ', '-')}-{planning_year}"
+
+            # Configure link parameters based on carrier type
+            # Get default efficiency from config if available
+            efficiency = carrier_properties.get(carrier, {}).get('efficiency', None)
+
             if carrier in ['CCGT', 'OCGT']:
                 bus0 = 'EU gas'
+                bus1 = "DE0 0"
                 # For CCGT, we now force a fixed capacity; for OCGT, use extendable as usual.
-                if carrier == 'CCGT':
-                    is_extendable = False
-                else:
-                    is_extendable = (min_cap != max_cap)
-                efficiency = 0.6 if carrier == 'CCGT' else 0.4
-            else:
+                is_extendable = (carrier != 'CCGT') and (min_cap != max_cap)
+                if efficiency is None:
+                    efficiency = 0.6 if carrier == 'CCGT' else 0.4
+
+            elif carrier in ['coal', 'lignite']:
                 bus0 = f"EU {carrier}"
+                bus1 = "DE0 0"
                 is_extendable = (min_cap != max_cap)
-                efficiency = 1.0
+                if efficiency is None:
+                    efficiency = 0.45 if carrier == 'coal' else 0.42
 
-            if "DE0 0" not in n.buses.index:
-                logging.warning("Bus 'DE0 0' not found in n.buses; link might not connect properly.")
+            elif carrier in ['biomass', 'solid biomass']:
+                bus0 = "EU biomass"
+                bus1 = "DE0 0"
+                is_extendable = (min_cap != max_cap)
+                if efficiency is None:
+                    efficiency = 0.4
 
-            if new_unit in n.links.index:
-                n.links.at[new_unit, 'p_nom'] = min_cap
-                n.links.at[new_unit, 'p_nom_min'] = min_cap
-                n.links.at[new_unit, 'p_nom_max'] = max_cap
-                n.links.at[new_unit, 'p_nom_extendable'] = is_extendable
-                n.links.at[new_unit, 'efficiency'] = efficiency
-                msg = "Updated"
+            elif 'gas CHP' in carrier:
+                bus0 = "EU gas"
+                bus1 = "DE0 0"
+                is_extendable = (min_cap != max_cap)
+                # Lower electrical efficiency for CHP units
+                if efficiency is None:
+                    efficiency = 0.40 if 'CC' in carrier else 0.35
+
+            elif 'biomass CHP' in carrier:
+                bus0 = "EU biomass"
+                bus1 = "DE0 0"
+                is_extendable = (min_cap != max_cap)
+                # Lower electrical efficiency for biomass CHP units
+                if efficiency is None:
+                    efficiency = 0.28 if 'CC' in carrier else 0.25
+
             else:
-                n.add(
-                    "Link",
-                    new_unit,
-                    bus0=bus0,
-                    bus1="DE0 0",
-                    carrier=carrier,
-                    p_nom=min_cap,
-                    p_nom_min=min_cap,
-                    p_nom_max=max_cap,
-                    p_nom_extendable=is_extendable,
-                    efficiency=efficiency
-                )
-                msg = "Added"
+                logging.warning(f"Unknown carrier type: {carrier}")
+                continue
+
+            # Check if required buses exist
+            if bus0 not in n.buses.index:
+                logging.warning(f"Bus '{bus0}' not found in n.buses. Creating it.")
+                n.add("Bus", bus0, carrier="gas" if "gas" in bus0 else "biomass")
+
+            if bus1 not in n.buses.index:
+                logging.warning(f"Bus '{bus1}' not found in n.buses; link might not connect properly.")
+
+            # For AC links, we need to create an intermediate bus and two links
+            if should_use_ac:
+                # 1. Create source bus if it doesn't exist
+                if source_name not in n.buses.index:
+                    n.add(
+                        "Bus",
+                        source_name,
+                        carrier=carrier
+                    )
+                    logging.info(f"Created source bus {source_name} for {carrier}")
+
+                # 2. Create source link that feeds fuel to the source bus
+                source_link_name = f"DE0 source-{carrier}-{planning_year}"
+                if source_link_name in n.links.index:
+                    n.links.at[source_link_name, 'p_nom'] = min_cap / efficiency  # Adjust for efficiency
+                    n.links.at[source_link_name, 'p_nom_min'] = min_cap / efficiency
+                    n.links.at[source_link_name, 'p_nom_max'] = max_cap / efficiency
+                    n.links.at[source_link_name, 'p_nom_extendable'] = is_extendable
+                    n.links.at[source_link_name, 'efficiency'] = 1.0  # Just fuel transfer
+                else:
+                    n.add(
+                        "Link",
+                        source_link_name,
+                        bus0=bus0,
+                        bus1=source_name,
+                        carrier=carrier,
+                        p_nom=min_cap / efficiency,
+                        p_nom_min=min_cap / efficiency,
+                        p_nom_max=max_cap / efficiency,
+                        p_nom_extendable=is_extendable,
+                        efficiency=1.0  # Just fuel transfer
+                    )
+
+                # 3. Add or update the AC link between source bus and target bus
+                if link_name in n.links.index:
+                    n.links.at[link_name, 'p_nom'] = min_cap
+                    n.links.at[link_name, 'p_nom_min'] = min_cap
+                    n.links.at[link_name, 'p_nom_max'] = max_cap
+                    n.links.at[link_name, 'p_nom_extendable'] = is_extendable
+                    n.links.at[link_name, 'efficiency'] = efficiency
+                    msg = "Updated"
+                else:
+                    n.add(
+                        "Link",
+                        link_name,
+                        bus0=source_name,
+                        bus1=bus1,
+                        carrier='AC',  # AC link
+                        p_nom=min_cap,
+                        p_nom_min=min_cap,
+                        p_nom_max=max_cap,
+                        p_nom_extendable=is_extendable,
+                        efficiency=efficiency
+                    )
+                    msg = "Added"
+            else:
+                # Regular link implementation (not using AC)
+                if link_name in n.links.index:
+                    n.links.at[link_name, 'p_nom'] = min_cap
+                    n.links.at[link_name, 'p_nom_min'] = min_cap
+                    n.links.at[link_name, 'p_nom_max'] = max_cap
+                    n.links.at[link_name, 'p_nom_extendable'] = is_extendable
+                    n.links.at[link_name, 'efficiency'] = efficiency
+                    msg = "Updated"
+                else:
+                    n.add(
+                        "Link",
+                        link_name,
+                        bus0=bus0,
+                        bus1=bus1,
+                        carrier=carrier,
+                        p_nom=min_cap,
+                        p_nom_min=min_cap,
+                        p_nom_max=max_cap,
+                        p_nom_extendable=is_extendable,
+                        efficiency=efficiency
+                    )
+                    msg = "Added"
 
             if min_cap == max_cap:
-                logging.info(f"{msg} {carrier} unit with fixed capacity: {min_cap} MW for year {year_str}")
+                logging.info(
+                    f"{msg} {carrier} {'AC ' if should_use_ac else ''}link with fixed capacity: {min_cap} MW for year {planning_year}")
             else:
-                logging.info(f"{msg} {carrier} unit with capacity range: {min_cap}-{max_cap} MW for year {year_str}")
+                logging.info(
+                    f"{msg} {carrier} {'AC ' if should_use_ac else ''}link with capacity range: {min_cap}-{max_cap} MW for year {planning_year}")
 
         # 5) Log final capacities for each carrier
         logging.info("\n====== FINAL CONFIGURATIONS ======")
-        total_capacities = {c: 0 for c in ['coal', 'lignite', 'CCGT', 'OCGT']}
+        total_capacities = {c: 0 for c in target_carriers}
 
-        for carrier in ['coal', 'lignite', 'CCGT', 'OCGT']:
-            units = n.links.loc[
+        for carrier in target_carriers:
+            # Check for generators first (relevant for biomass)
+            if carrier in ['biomass', 'solid biomass']:
+                gen_units = n.generators.loc[
+                    (n.generators.carrier.isin(['biomass', 'solid biomass'])) &
+                    (n.generators.bus.isin(de_buses))
+                    ]
+                if not gen_units.empty:
+                    gen_cap = gen_units["p_nom"].sum()
+                    gen_min = gen_units["p_nom_min"].sum()
+                    gen_max = gen_units["p_nom_max"].sum()
+                    total_capacities[carrier] = gen_min
+
+                    logging.info(f"\nDE {carrier} (generators):")
+                    logging.info(f"  - Current capacity: {gen_cap:.1f} MW")
+                    logging.info(f"  - Min capacity: {gen_min:.1f} MW")
+                    logging.info(f"  - Max capacity: {gen_max:.1f} MW")
+
+            # Check for links with direct carrier
+            link_units = n.links.loc[
                 (n.links.carrier == carrier) &
                 (n.links.bus1.isin(de_buses))
                 ]
-            total_cap = units["p_nom"].sum()
-            total_min = units["p_nom_min"].sum()
-            total_max = units["p_nom_max"].sum()
-            total_capacities[carrier] = total_min
 
-            logging.info(f"\nDE {carrier}:")
-            logging.info(f"  - Current capacity: {total_cap:.1f} MW")
-            logging.info(f"  - Min capacity: {total_min:.1f} MW")
-            logging.info(f"  - Max capacity: {total_max:.1f} MW")
+            # Also check for AC links if this carrier might use them
+            ac_link_units = pd.DataFrame()
+            if has_ac_links and carrier in ac_carriers:
+                # Look for AC links where bus0 contains the carrier name
+                source_pattern = f"DE0 {carrier}"
+                ac_link_units = n.links.loc[
+                    (n.links.carrier == 'AC') &
+                    (n.links.bus1.isin(de_buses)) &
+                    (n.links.bus0.str.startswith(source_pattern))
+                    ]
+
+            # Combine direct and AC links
+            all_links = pd.concat([link_units, ac_link_units])
+
+            if not all_links.empty:
+                link_cap = all_links["p_nom"].sum()
+                link_min = all_links["p_nom_min"].sum()
+                link_max = all_links["p_nom_max"].sum()
+
+                # Add to total capacities (may add to existing biomass from generators)
+                if carrier in total_capacities:
+                    total_capacities[carrier] += link_min
+                else:
+                    total_capacities[carrier] = link_min
+
+                # Show separate metrics for direct and AC links
+                if not link_units.empty and not ac_link_units.empty:
+                    logging.info(f"\nDE {carrier} (direct links):")
+                    logging.info(f"  - Current capacity: {link_units['p_nom'].sum():.1f} MW")
+                    logging.info(f"  - Min capacity: {link_units['p_nom_min'].sum():.1f} MW")
+                    logging.info(f"  - Max capacity: {link_units['p_nom_max'].sum():.1f} MW")
+
+                    logging.info(f"\nDE {carrier} (AC links):")
+                    logging.info(f"  - Current capacity: {ac_link_units['p_nom'].sum():.1f} MW")
+                    logging.info(f"  - Min capacity: {ac_link_units['p_nom_min'].sum():.1f} MW")
+                    logging.info(f"  - Max capacity: {ac_link_units['p_nom_max'].sum():.1f} MW")
+
+                    logging.info(f"\nDE {carrier} (total):")
+                else:
+                    logging.info(f"\nDE {carrier}:")
+
+                logging.info(f"  - Current capacity: {link_cap:.1f} MW")
+                logging.info(f"  - Min capacity: {link_min:.1f} MW")
+                logging.info(f"  - Max capacity: {link_max:.1f} MW")
 
         logging.info("\nTotal Capacities:")
         for c, cap in total_capacities.items():
             logging.info(f"{c}: {cap:.1f} MW")
-        logging.info(f"Total Gas: {total_capacities['CCGT'] + total_capacities['OCGT']:.1f} MW")
+
+        # Calculate some useful aggregates
+        total_gas = total_capacities.get('CCGT', 0) + total_capacities.get('OCGT', 0)
+        total_gas_chp = total_capacities.get('urban central gas CHP', 0) + total_capacities.get(
+            'urban central gas CHP CC', 0)
+
+        # Use either 'biomass' or 'solid biomass', whichever is non-zero
+        total_biomass = max(total_capacities.get('biomass', 0), total_capacities.get('solid biomass', 0))
+
+        total_biomass_chp = total_capacities.get('urban central solid biomass CHP', 0) + total_capacities.get(
+            'urban central solid biomass CHP CC', 0)
+
+        logging.info(f"Total Gas (CCGT+OCGT): {total_gas:.1f} MW")
+        logging.info(f"Total Gas CHP: {total_gas_chp:.1f} MW")
+        logging.info(f"Total Biomass: {total_biomass:.1f} MW")
+        logging.info(f"Total Biomass CHP: {total_biomass_chp:.1f} MW")
 
     except Exception as e:
         logging.error(f"Error while processing limits: {e}", exc_info=True)
@@ -2128,30 +2378,975 @@ def analyze_dsm_usage(n):
         logger.info(f"  - System generation/load balance may not require DSM")
         logger.info(f"  - Cheaper flexibility options like interconnection might be preferred")
 
+
+def add_resistive_heater_constraints(n):
+    """
+    Imposes max capacity constraints on resistive heaters in Germany.
+    Uses the same approach as the working heat_pump_constraints function.
+    """
+    import logging
+    import pandas as pd
+
+    logging.info("[Resistive heater constraints] Starting resistive heater constraint application...")
+
+    # Get config and check if constraints are enabled
+    if not hasattr(n, 'config'):
+        try:
+            n.config = snakemake.config
+            logging.info("[Resistive heater constraints] Got config from snakemake")
+        except (NameError, AttributeError):
+            logging.warning("[Resistive heater constraints] No config found, skipping resistive heater constraints")
+            return
+
+    # Try multiple possible paths for resistive heater config
+    resistive_config = None
+    possible_paths = [
+        # Path 1: Under solving.constraints
+        n.config.get('solving', {}).get('constraints', {}).get('resistive_heaters', {}),
+        # Path 2: Directly under constraints
+        n.config.get('constraints', {}).get('resistive_heaters', {}),
+        # Path 3: At top level
+        n.config.get('resistive_heaters', {})
+    ]
+
+    # Log the config structure for debugging
+    logging.info("[Resistive heater constraints] Config contains these top-level keys: " +
+                 str(list(n.config.keys())))
+    if 'solving' in n.config:
+        logging.info("[Resistive heater constraints] 'solving' section contains: " +
+                     str(list(n.config['solving'].keys())))
+        if 'constraints' in n.config['solving']:
+            logging.info("[Resistive heater constraints] 'solving.constraints' section contains: " +
+                         str(list(n.config['solving']['constraints'].keys())))
+
+    # Try each path and use the first one that has apply_constraints=True
+    for i, path_config in enumerate(possible_paths):
+        if path_config and path_config.get('apply_constraints', False):
+            resistive_config = path_config
+            logging.info(f"[Resistive heater constraints] Found enabled resistive heater config at path {i + 1}")
+            break
+
+    # If none of the paths had apply_constraints=True
+    if resistive_config is None or not resistive_config.get('apply_constraints', False):
+        logging.info("[Resistive heater constraints] Resistive heater constraints disabled in config, skipping")
+        return
+
+    # Get planning year with multiple fallbacks
+    try:
+        planning_year = int(snakemake.wildcards.planning_horizons)
+        logging.info(f"[Resistive heater constraints] Got planning year {planning_year} from snakemake wildcards")
+    except:
+        # Try other methods to determine planning year
+        planning_year = 2045  # Default fallback
+        logging.info(f"[Resistive heater constraints] Using default planning year {planning_year}")
+
+    year_str = str(planning_year)
+    logging.info(f"[Resistive heater constraints] Final planning year: {year_str}")
+
+    # Get active scenario
+    active_scenario = resistive_config.get('active_scenario', 'restrictive')
+    logging.info(f"[Resistive heater constraints] Using {active_scenario} resistive heater scenario from config")
+
+    # Get countries to apply constraints to
+    countries_to_process = resistive_config.get('countries', [])
+    if not countries_to_process:
+        # If empty, apply to all countries in the network
+        countries_to_process = n.buses.country.unique().tolist()
+        logging.info(f"[Resistive heater constraints] Applying to all countries in network: {countries_to_process}")
+    else:
+        logging.info(f"[Resistive heater constraints] Applying to specified countries: {countries_to_process}")
+
+    # Get scenario config
+    scenario_config = resistive_config.get('scenarios', {}).get(active_scenario, {})
+
+    # Debug log the scenario config
+    logging.info(
+        f"[Resistive heater constraints] Available years in {active_scenario} scenario: {list(scenario_config.keys())}")
+    logging.info(
+        f"[Resistive heater constraints] Types of year keys: {[type(k).__name__ for k in scenario_config.keys()]}")
+
+    # Find all resistive heater carriers in the network
+    all_carriers = n.links.carrier.unique()
+    resistive_heater_carriers = [c for c in all_carriers if 'resistive' in c.lower()]
+    logging.info(f"[Resistive heater constraints] Detected resistive heater carriers: {resistive_heater_carriers}")
+
+    # Ensure all carriers are in the carriers component
+    if "carriers" not in n.components:
+        n.add("Carrier", resistive_heater_carriers)
+        logging.info(f"[Resistive heater constraints] Added resistive heater carriers to network")
+    elif not all(c in n.carriers.index for c in resistive_heater_carriers):
+        # Add any missing carriers
+        missing_carriers = [c for c in resistive_heater_carriers if c not in n.carriers.index]
+        for c in missing_carriers:
+            n.add("Carrier", c)
+        logging.info(f"[Resistive heater constraints] Added missing carriers: {missing_carriers}")
+
+    # Log the initial capacities
+    logging.info("[Resistive heater constraints] Initial capacities before constraints:")
+    for rh_carrier in resistive_heater_carriers:
+        total_cap = n.links.loc[n.links.carrier == rh_carrier, 'p_nom'].sum()
+        num_links = len(n.links[n.links.carrier == rh_carrier])
+        logging.info(f"  {rh_carrier}: {total_cap:.2f} MW across {num_links} links")
+
+    # Process each country
+    countries_processed = 0
+    total_links_constrained = 0
+
+    for country in countries_to_process:
+        # Get year config
+        year_dict = None
+        for key in scenario_config:
+            if str(key) == year_str:
+                year_dict = scenario_config[key]
+                logging.info(f"[Resistive heater constraints] Found year {key} matching {year_str}")
+                break
+
+        if year_dict is None:
+            logging.warning(f"[Resistive heater constraints] No data for year {year_str} in {active_scenario} scenario")
+            continue
+
+        # Get buses for this country
+        country_buses = n.buses.index[n.buses.country == country]
+        if len(country_buses) == 0:
+            logging.warning(f"[Resistive heater constraints] No buses found for {country}")
+            continue
+
+        logging.info(f"[Resistive heater constraints] Processing country: {country} with {len(country_buses)} buses")
+
+        # Track country totals
+        country_max = 0
+        country_links = 0
+
+        # Find all resistive heater links in this country
+        for rh_carrier, caps in year_dict.items():
+            if rh_carrier in resistive_heater_carriers:
+                # Get the maximum capacity constraint
+                max_cap = caps.get("max", float('inf'))
+
+                # Look for links with bus0 (input) in this country
+                relevant_links = n.links.index[
+                    (n.links.carrier == rh_carrier) &
+                    (n.links.bus0.isin(country_buses))
+                    ]
+
+                if len(relevant_links) == 0:
+                    logging.warning(f"[Resistive heater constraints] No {rh_carrier} links found in {country}")
+                    continue
+
+                # Calculate current total capacity
+                current_capacity = n.links.loc[relevant_links, 'p_nom'].sum()
+
+                # Log what we found
+                logging.info(
+                    f"[Resistive heater constraints] Found {len(relevant_links)} {rh_carrier} links in {country} "
+                    f"with initial capacity {current_capacity:.2f} MW, target: {max_cap} MW")
+
+                # Set capacity equally across all links
+                capacity_per_link = max_cap / len(relevant_links)
+
+                # Apply the constraint to each link
+                for link in relevant_links:
+                    # CRITICAL: Following the same pattern as the heat_pump_constraints function
+                    # Set fixed capacity and make non-extendable
+                    original_capacity = n.links.at[link, 'p_nom']
+                    n.links.at[link, 'p_nom'] = capacity_per_link
+                    n.links.at[link, 'p_nom_extendable'] = False
+
+                    logging.info(
+                        f"[Resistive heater constraints] RESET: {link} capacity from {original_capacity:.2f} MW to {capacity_per_link:.2f} MW")
+
+                logging.info(f"[Resistive heater constraints] Limited {rh_carrier} capacity to {max_cap} MW "
+                             f"({capacity_per_link:.2f} MW per link across {len(relevant_links)} links)")
+
+                country_max += max_cap
+                country_links += len(relevant_links)
+                total_links_constrained += len(relevant_links)
+
+            elif rh_carrier not in resistive_heater_carriers and rh_carrier != 'total':
+                logging.warning(f"[Resistive heater constraints] Carrier {rh_carrier} not found in network")
+
+        # Process 'total' constraint if present
+        if 'total' in year_dict and resistive_heater_carriers:
+            total_max = year_dict['total'].get('max', float('inf'))
+
+            # Get all resistive heater links in this country
+            all_resistive_links = []
+            for carrier in resistive_heater_carriers:
+                carrier_links = n.links.index[
+                    (n.links.carrier == carrier) &
+                    (n.links.bus0.isin(country_buses))
+                    ]
+                all_resistive_links.extend(carrier_links)
+
+            # Remove duplicates
+            all_resistive_links = list(set(all_resistive_links))
+
+            if all_resistive_links:
+                # Calculate current total capacity
+                current_total = n.links.loc[all_resistive_links, 'p_nom'].sum()
+
+                if current_total > total_max:
+                    # Scale down all links proportionally
+                    scaling_factor = total_max / current_total if current_total > 0 else 0
+
+                    for link in all_resistive_links:
+                        original_capacity = n.links.at[link, 'p_nom']
+                        new_capacity = original_capacity * scaling_factor
+                        n.links.at[link, 'p_nom'] = new_capacity
+                        n.links.at[link, 'p_nom_extendable'] = False
+
+                        logging.info(
+                            f"[Resistive heater constraints] TOTAL ADJUST: {link} capacity from {original_capacity:.2f} MW to {new_capacity:.2f} MW")
+
+                logging.info(
+                    f"[Resistive heater constraints] Applied total resistive heater constraint: {total_max} MW")
+
+        # Log country summary
+        if country_links > 0:
+            logging.info(
+                f"[Resistive heater constraints] {country}: Applied capacity constraints to {country_links} links, max total: {country_max} MW")
+            countries_processed += 1
+
+    # Log overall summary
+    if total_links_constrained > 0:
+        logging.info(
+            f"[Resistive heater constraints] Successfully applied constraints to {total_links_constrained} resistive heater links across {countries_processed} countries")
+    else:
+        logging.warning(f"[Resistive heater constraints] No resistive heater constraints were applied")
+
+    # Add extra log to show the post-constraint capacities
+    try:
+        resistive_capacities = []
+        for idx, row in n.links.iterrows():
+            if 'resistive' in row['carrier'].lower():
+                if row['bus0'].startswith(tuple(countries_to_process)):
+                    resistive_capacities.append({
+                        'Link': idx,
+                        'Carrier': row['carrier'],
+                        'Country': row['bus0'][:2],
+                        'Max Capacity': row.get('p_nom_max', 'Not set'),
+                        'Current Capacity': row.get('p_nom', 0),
+                        'Extendable': row.get('p_nom_extendable', False)
+                    })
+
+        if resistive_capacities:
+            capacities_df = pd.DataFrame(resistive_capacities)
+            # Group by carrier and country
+            capacities_summary = capacities_df.groupby(['Country', 'Carrier']).agg({
+                'Current Capacity': 'sum',
+                'Link': 'count',
+                'Max Capacity': lambda x: sum([y for y in x if y != 'Not set'])
+            }).reset_index()
+            capacities_summary.columns = ['Country', 'Carrier', 'Total Capacity (MW)', 'Number of Links',
+                                          'Max Capacity (MW)']
+            logging.info(
+                f"[Resistive heater constraints] Current resistive heater capacities by carrier:\n{capacities_summary.to_string()}")
+
+            # Add overall summary by country
+            country_summary = capacities_df.groupby('Country').agg({
+                'Current Capacity': 'sum',
+                'Link': 'count',
+                'Max Capacity': lambda x: sum([y for y in x if y != 'Not set'])
+            }).reset_index()
+            country_summary.columns = ['Country', 'Total Capacity (MW)', 'Number of Links', 'Max Capacity (MW)']
+            logging.info(
+                f"[Resistive heater constraints] Current resistive heater capacities by country:\n{country_summary.to_string()}")
+
+            # Verify final capacities
+            total_capacity = capacities_df['Current Capacity'].sum()
+            if total_capacity > country_max:
+                logging.error(f"[Resistive heater constraints] WARNING: Final capacity ({total_capacity:.2f} MW) "
+                              f"still exceeds limit ({country_max} MW)!")
+            else:
+                logging.info(f"[Resistive heater constraints] SUCCESS: Final capacity ({total_capacity:.2f} MW) "
+                             f"now respects limit ({country_max} MW)")
+        else:
+            logging.info("[Resistive heater constraints] No resistive heater links with installed capacity found")
+    except Exception as e:
+        logging.error(f"[Resistive heater constraints] Error generating capacity summary: {e}")
+
+    logging.info("[Resistive heater constraints] Completed resistive heater constraint application")
+
+
+def add_renewable_share_constraints(n):
+    """
+    Adds constraints to enforce minimum/maximum renewable generation share for Germany (DE).
+    Uses direct constraint creation approach as in add_power_limits function.
+
+    Parameters:
+    -----------
+    n : pypsa.Network
+        The PyPSA network to which constraints will be applied
+    """
+    import logging
+    import json
+
+    logging.info("[Renewable share constraints] Starting renewable share constraint application...")
+
+    # Get config and check if constraints are enabled
+    config = n.config
+    renewable_config = config.get('solving', {}).get('constraints', {}).get('renewable_share', {})
+
+    if not renewable_config:
+        # Try to find renewable_share at root level
+        renewable_config = config.get('renewable_share', {})
+
+    if not renewable_config:
+        # Try to find it in constraints at root level
+        renewable_config = config.get('constraints', {}).get('renewable_share', {})
+
+    # Log the full config structure for debugging
+    try:
+        logging.info(f"[Renewable share constraints] Full renewable config: {json.dumps(renewable_config, indent=2)}")
+    except:
+        logging.info(f"[Renewable share constraints] Renewable config: {renewable_config}")
+
+    if not renewable_config.get('apply_constraints', False):
+        logging.info("[Renewable share constraints] Renewable share constraints disabled in config")
+        return
+
+    # Get planning year
+    try:
+        planning_year = int(snakemake.wildcards.planning_horizons)
+        logging.info(f"[Renewable share constraints] Using planning year {planning_year} from wildcards")
+    except (NameError, AttributeError, ValueError):
+        # Fallback to default
+        planning_year = 2045
+        logging.warning(
+            f"[Renewable share constraints] Could not get planning year from wildcards, using default: {planning_year}")
+
+    year_str = str(planning_year)
+
+    # Get active scenario from config
+    active_scenario = renewable_config.get('active_scenario', 'target')
+    logging.info(f"[Renewable share constraints] Using {active_scenario} scenario")
+
+    # Get the constraint configuration for this year and scenario
+    scenario_data = renewable_config.get('scenarios', {}).get(active_scenario, {})
+
+    # Log the scenario data
+    try:
+        logging.info(f"[Renewable share constraints] Scenario data: {json.dumps(scenario_data, indent=2)}")
+    except:
+        logging.info(f"[Renewable share constraints] Scenario data: {scenario_data}")
+
+    # Check if we have data for this year
+    if year_str not in scenario_data:
+        # Log all available years for debugging
+        available_years = list(scenario_data.keys())
+        logging.warning(f"[Renewable share constraints] Available years in scenario: {available_years}")
+        logging.warning(
+            f"[Renewable share constraints] No constraints defined for year {year_str} in {active_scenario} scenario")
+
+        # Try with integer key in case the config has numeric keys
+        if planning_year in scenario_data:
+            year_data = scenario_data[planning_year]
+            logging.info(f"[Renewable share constraints] Found data using integer key {planning_year}")
+        else:
+            # Try with nearest year if no exact match
+            nearest_year = min(available_years, key=lambda x: abs(int(x) - planning_year)) if available_years else None
+            if nearest_year:
+                year_data = scenario_data[nearest_year]
+                logging.info(
+                    f"[Renewable share constraints] Using nearest year {nearest_year} instead of {planning_year}")
+            else:
+                return
+    else:
+        year_data = scenario_data[year_str]
+
+    logging.info(f"[Renewable share constraints] Applying constraints for year {year_str}")
+
+    # Use specified renewable carriers from config or default to the provided list
+    default_renewable_carriers = ['solar', 'solar-hsat', 'onwind', 'offwind-ac', 'offwind-dc', 'offwind-float', 'hydro']
+    renewable_carriers = renewable_config.get('renewable_carriers', default_renewable_carriers)
+
+    # Get non-renewable carriers from config or use a default list
+    default_non_renewable_carriers = ['gas', 'oil', 'lignite', 'coal', 'nuclear', 'OCGT', 'CCGT']
+    non_renewable_carriers = renewable_config.get('non_renewable_carriers', default_non_renewable_carriers)
+
+    # Get ambiguous carriers (those that need special handling)
+    default_ambiguous_carriers = {'H2': False, 'battery': True,
+                                  'PHS': True}  # Default classification (True = renewable)
+    ambiguous_carriers_map = renewable_config.get('ambiguous_carriers', default_ambiguous_carriers)
+
+    logging.info(f"[Renewable share constraints] Base renewable carriers: {renewable_carriers}")
+    logging.info(f"[Renewable share constraints] Non-renewable carriers: {non_renewable_carriers}")
+    logging.info(f"[Renewable share constraints] Ambiguous carriers: {ambiguous_carriers_map}")
+
+    # Expand each carrier to include variations in naming
+    def expand_carrier_list(carrier_list):
+        expanded = []
+        for carrier in carrier_list:
+            # Find generators with this carrier (exact match or containing the carrier name)
+            matching_gen_carriers = [c for c in n.generators.carrier.unique()
+                                     if carrier == c or carrier in c.lower().split('-')]
+            expanded.extend(matching_gen_carriers)
+        return list(set(expanded))  # Remove duplicates
+
+    expanded_renewable_carriers = expand_carrier_list(renewable_carriers)
+    expanded_non_renewable_carriers = expand_carrier_list(non_renewable_carriers)
+
+    # For ambiguous carriers, check each generator carrier name
+    ambiguous_renewable = []
+    ambiguous_non_renewable = []
+
+    for gen_carrier in n.generators.carrier.unique():
+        for amb_carrier, is_renewable in ambiguous_carriers_map.items():
+            if amb_carrier in gen_carrier.lower():
+                if is_renewable:
+                    ambiguous_renewable.append(gen_carrier)
+                else:
+                    ambiguous_non_renewable.append(gen_carrier)
+
+    # Add ambiguous carriers to their respective lists
+    expanded_renewable_carriers.extend(ambiguous_renewable)
+    expanded_non_renewable_carriers.extend(ambiguous_non_renewable)
+
+    # Remove any duplicates (ensure no carrier is in both lists)
+    expanded_renewable_carriers = list(set(expanded_renewable_carriers) - set(expanded_non_renewable_carriers))
+
+    logging.info(f"[Renewable share constraints] Expanded renewable carriers: {expanded_renewable_carriers}")
+    logging.info(f"[Renewable share constraints] Expanded non-renewable carriers: {expanded_non_renewable_carriers}")
+
+    # Focus on Germany (DE)
+    country = 'DE'
+    if country not in year_data:
+        logging.warning(f"[Renewable share constraints] No constraint defined for {country}")
+        return
+
+    country_data = year_data[country]
+    min_share = country_data.get('min', None)
+    max_share = country_data.get('max', None)
+
+    logging.info(f"[Renewable share constraints] Constraints for {country}: min={min_share}, max={max_share}")
+
+    if min_share is None and max_share is None:
+        logging.warning(f"[Renewable share constraints] No min/max share defined for {country}")
+        return
+
+    try:
+        # Find buses in this country
+        country_buses = n.buses.index[n.buses.country == country]
+        if len(country_buses) == 0:
+            logging.warning(f"[Renewable share constraints] No buses found for {country}, skipping")
+            return
+
+        # Find generators connected to these buses
+        country_gens = n.generators.index[n.generators.bus.isin(country_buses)]
+        renewable_country_gens = []
+        non_renewable_country_gens = []
+        unclassified_gens = []
+
+        for gen in country_gens:
+            carrier = n.generators.at[gen, 'carrier']
+            if carrier in expanded_renewable_carriers:
+                renewable_country_gens.append(gen)
+            elif carrier in expanded_non_renewable_carriers:
+                non_renewable_country_gens.append(gen)
+            else:
+                # If not explicitly classified, log it for review and treat as non-renewable
+                unclassified_gens.append(gen)
+                non_renewable_country_gens.append(gen)
+
+        if unclassified_gens:
+            unclassified_carriers = [n.generators.at[gen, 'carrier'] for gen in unclassified_gens]
+            logging.warning(
+                f"[Renewable share constraints] Unclassified generator carriers: {set(unclassified_carriers)}")
+
+        logging.info(
+            f"[Renewable share constraints] {country}: found {len(renewable_country_gens)} renewable generators, "
+            f"{len(non_renewable_country_gens)} non-renewable generators "
+            f"out of {len(country_gens)} total generators")
+
+        # Ensure we have both renewable and total generators
+        if len(renewable_country_gens) == 0:
+            logging.warning(f"[Renewable share constraints] No renewable generators found for {country}, skipping")
+            return
+
+        # Key approach: iterate over snapshots as in the add_power_limits function
+        constraint_counter = 0
+        for t in n.snapshots:
+            try:
+                # Get generation variables for this snapshot
+                renewable_gen_vars = n.model["Generator-p"].loc[t, renewable_country_gens]
+                total_gen_vars = n.model["Generator-p"].loc[t, country_gens]
+
+                # For minimum share: renewable_gen >= min_share * total_gen
+                if min_share is not None:
+                    # Create expressions for minimum share constraint
+                    renewable_sum = renewable_gen_vars.sum()
+                    total_sum = total_gen_vars.sum()
+
+                    # Create the constraint: renewable_sum >= min_share * total_sum
+                    # Rearranged as: renewable_sum - min_share * total_sum >= 0
+                    cname_min = f"renewable-share-min-{country}-{t}"
+                    n.model.add_constraints(renewable_sum - min_share * total_sum >= 0, name=cname_min)
+                    constraint_counter += 1
+
+                # For maximum share: renewable_gen <= max_share * total_gen
+                if max_share is not None:
+                    # Create expressions for maximum share constraint
+                    renewable_sum = renewable_gen_vars.sum()
+                    total_sum = total_gen_vars.sum()
+
+                    # Create the constraint: renewable_sum <= max_share * total_sum
+                    # Rearranged as: renewable_sum - max_share * total_sum <= 0
+                    cname_max = f"renewable-share-max-{country}-{t}"
+                    n.model.add_constraints(renewable_sum - max_share * total_sum <= 0, name=cname_max)
+                    constraint_counter += 1
+
+                # Log progress for every 100 constraints
+                if constraint_counter % 100 == 0:
+                    logging.info(f"[Renewable share constraints] Added {constraint_counter} constraints so far...")
+
+            except Exception as e:
+                logging.error(f"[Renewable share constraints] Error creating constraints for snapshot {t}: {e}")
+                import traceback
+                logging.error(traceback.format_exc())
+
+        logging.info(
+            f"[Renewable share constraints] Successfully added {constraint_counter} renewable share constraints for {country}")
+
+        # Add a callback to check the final values after solving
+        def log_final_renewable_share():
+            try:
+                if not hasattr(n, 'generators_t') or not hasattr(n.generators_t, 'p'):
+                    logging.info(f"[Renewable share constraints] No generator outputs in results")
+                    return
+
+                # Get the actual generation data
+                gen_data = n.generators_t.p
+
+                # Calculate total generation by country
+                country_gen_total = gen_data[country_gens].sum().sum()
+                country_renewable_gen = gen_data[renewable_country_gens].sum().sum()
+
+                # Calculate the share
+                if country_gen_total > 0:
+                    actual_share = country_renewable_gen / country_gen_total
+                    logging.info(
+                        f"[Renewable share constraints] Final renewable share for {country}: {actual_share:.2%}")
+
+                    # Compare with constraints
+                    if min_share is not None and actual_share < min_share:
+                        logging.warning(
+                            f"[Renewable share constraints] Final share ({actual_share:.2%}) is less than minimum ({min_share:.0%})")
+
+                    if max_share is not None and actual_share > max_share:
+                        logging.warning(
+                            f"[Renewable share constraints] Final share ({actual_share:.2%}) exceeds maximum ({max_share:.0%})")
+
+                    # Detailed generation breakdown
+                    logging.info(f"[Renewable share constraints] Total generation: {country_gen_total:.2f} MWh")
+                    logging.info(f"[Renewable share constraints] Renewable generation: {country_renewable_gen:.2f} MWh")
+
+                    # Show largest contributors
+                    top_gens = gen_data[country_gens].sum().sort_values(ascending=False).head(10)
+                    logging.info(f"[Renewable share constraints] Top generators:")
+                    for gen, value in top_gens.items():
+                        carrier = n.generators.at[gen, 'carrier']
+                        is_renewable = "Renewable" if gen in renewable_country_gens else "Non-renewable"
+                        logging.info(f"  - {gen} ({carrier}, {is_renewable}): {value:.2f} MWh")
+                else:
+                    logging.warning(f"[Renewable share constraints] No generation found for {country}")
+            except Exception as e:
+                logging.error(f"[Renewable share constraints] Error calculating final share: {e}")
+                import traceback
+                logging.error(traceback.format_exc())
+
+        # Store the callback function to be called after solving
+        if not hasattr(n, 'post_solve_callbacks'):
+            n.post_solve_callbacks = []
+        n.post_solve_callbacks.append(log_final_renewable_share)
+
+    except Exception as e:
+        logging.error(f"[Renewable share constraints] Error processing {country}: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
+
+    logging.info("[Renewable share constraints] Completed renewable share constraint application")
+
+
+def add_storage_capacity_limits(n):
+    """
+    Adds constraints to enforce minimum/maximum battery storage capacity for Germany (DE).
+
+    Parameters:
+    -----------
+    n : pypsa.Network
+        The PyPSA network to which constraints will be applied
+    """
+    import logging
+    import json
+
+    logging.info("[Storage capacity limits] Starting storage capacity limit constraint application...")
+
+    # Get config
+    config = n.config
+    storage_config = config.get('solving', {}).get('constraints', {}).get('storage_capacity_limits', {})
+
+    if not storage_config:
+        # Try to find storage_capacity_limits at root level
+        storage_config = config.get('storage_capacity_limits', {})
+
+    if not storage_config:
+        # Try to find it in constraints at root level
+        storage_config = config.get('constraints', {}).get('storage_capacity_limits', {})
+
+    # Log the full config structure for debugging
+    try:
+        logging.info(f"[Storage capacity limits] Full storage config: {json.dumps(storage_config, indent=2)}")
+    except:
+        logging.info(f"[Storage capacity limits] Storage config: {storage_config}")
+
+    if not storage_config.get('apply_constraints', False):
+        logging.info("[Storage capacity limits] Storage capacity limit constraints disabled in config")
+        return
+
+    # Get planning year
+    try:
+        planning_year = int(snakemake.wildcards.planning_horizons)
+        logging.info(f"[Storage capacity limits] Using planning year {planning_year} from wildcards")
+    except (NameError, AttributeError, ValueError):
+        # Fallback to default
+        planning_year = 2045
+        logging.warning(
+            f"[Storage capacity limits] Could not get planning year from wildcards, using default: {planning_year}")
+
+    year_str = str(planning_year)
+
+    # Get the constraint limits for this year
+    year_limits = storage_config.get('limits', {}).get(year_str, {})
+
+    # If not found as string, try with integer
+    if not year_limits and planning_year in storage_config.get('limits', {}):
+        year_limits = storage_config.get('limits', {}).get(planning_year, {})
+        logging.info(f"[Storage capacity limits] Found limits using integer key {planning_year}")
+
+    # If still not found, try nearest year
+    if not year_limits:
+        available_years = [int(y) for y in storage_config.get('limits', {}).keys() if str(y).isdigit()]
+        if available_years:
+            nearest_year = min(available_years, key=lambda x: abs(x - planning_year))
+            year_limits = storage_config.get('limits', {}).get(str(nearest_year), {})
+            logging.info(f"[Storage capacity limits] Using nearest year {nearest_year} instead of {planning_year}")
+
+    if not year_limits:
+        logging.warning(f"[Storage capacity limits] No limits defined for year {planning_year}")
+        return
+
+    logging.info(f"[Storage capacity limits] Applying limits for year {planning_year}")
+
+    # Focus on Germany (DE)
+    country = 'DE'
+    if country not in year_limits:
+        logging.warning(f"[Storage capacity limits] No limits defined for {country}")
+        return
+
+    country_limits = year_limits[country]
+    min_capacity = country_limits.get('min', None)  # In GW
+    max_capacity = country_limits.get('max', None)  # In GW
+
+    if min_capacity is not None:
+        min_capacity = min_capacity * 1000  # Convert GW to MW
+    if max_capacity is not None:
+        max_capacity = max_capacity * 1000  # Convert GW to MW
+
+    logging.info(f"[Storage capacity limits] Limits for {country}: min={min_capacity} MW, max={max_capacity} MW")
+
+    if min_capacity is None and max_capacity is None:
+        logging.warning(f"[Storage capacity limits] No min/max capacity defined for {country}")
+        return
+
+    # Get carriers to consider as battery storage
+    default_battery_carriers = ['battery', 'home battery']
+    battery_carriers = storage_config.get('battery_carriers', default_battery_carriers)
+
+    # Expand to include variations (like 'battery charger', 'battery discharger', etc.)
+    expanded_battery_carriers = []
+    for carrier in battery_carriers:
+        expanded_battery_carriers.append(carrier)
+        expanded_battery_carriers.append(f"{carrier} charger")
+        expanded_battery_carriers.append(f"{carrier} discharger")
+
+    logging.info(f"[Storage capacity limits] Battery carriers (expanded): {expanded_battery_carriers}")
+
+    try:
+        # Find all links in Germany that are battery-related
+        # First find buses in Germany
+        country_buses = n.buses.index[n.buses.country == country]
+        if len(country_buses) == 0:
+            logging.warning(f"[Storage capacity limits] No buses found for {country}, skipping")
+            return
+
+        # Find battery links connected to these buses
+        battery_links = []
+        for link in n.links.index:
+            link_carrier = n.links.at[link, 'carrier']
+            bus0 = n.links.at[link, 'bus0']
+            bus1 = n.links.at[link, 'bus1']
+
+            # Check if it's a battery link (more flexible matching)
+            is_battery = any(battery in link_carrier.lower() for battery in battery_carriers)
+            is_in_germany = (bus0 in country_buses) or (bus1 in country_buses)
+
+            if is_battery and is_in_germany:
+                battery_links.append(link)
+
+        # Log all found battery links for debugging
+        logging.info(f"[Storage capacity limits] Found {len(battery_links)} battery links in {country}")
+        for i, link in enumerate(battery_links):
+            if i < 10:  # Limit to first 10 to avoid too much logging
+                logging.info(
+                    f"[Storage capacity limits] Battery link {i + 1}: {link}, carrier: {n.links.at[link, 'carrier']}")
+
+        if len(battery_links) == 0:
+            logging.warning(f"[Storage capacity limits] No battery links found for {country}, skipping")
+            return
+
+        # Group battery links by type
+        chargers = []
+        dischargers = []
+        for link in battery_links:
+            carrier = n.links.at[link, 'carrier'].lower()
+            if 'charger' in carrier:
+                chargers.append(link)
+            elif 'discharger' in carrier:
+                dischargers.append(link)
+            else:
+                # For other battery links without explicit charger/discharger in name
+                # Check efficiency or bus connection pattern
+                efficiency = n.links.at[link, 'efficiency']
+                bus0 = n.links.at[link, 'bus0']
+                bus1 = n.links.at[link, 'bus1']
+
+                if 'battery' in bus1.lower():
+                    # If the destination bus has 'battery' in the name, it's likely a charger
+                    chargers.append(link)
+                elif 'battery' in bus0.lower():
+                    # If the source bus has 'battery' in the name, it's likely a discharger
+                    dischargers.append(link)
+                elif efficiency > 0:
+                    # Fallback - based on efficiency
+                    chargers.append(link)
+                else:
+                    dischargers.append(link)
+
+        logging.info(f"[Storage capacity limits] Found {len(chargers)} chargers and {len(dischargers)} dischargers")
+
+        # Check if we have any battery links
+        if len(chargers) + len(dischargers) == 0:
+            logging.warning(f"[Storage capacity limits] No battery chargers/dischargers found for {country}, skipping")
+            return
+
+        # Since we're constraining capacity, we need to be careful about double-counting
+        # We'll focus on dischargers since they represent the usable capacity
+        target_links = dischargers if dischargers else chargers
+
+        # To avoid double counting when both chargers and dischargers exist, we'll use just one type
+        if len(dischargers) > 0 and len(chargers) > 0:
+            target_links = dischargers
+            logging.info(f"[Storage capacity limits] Using only dischargers to avoid double-counting")
+
+        # For extendable links, we need to constrain the p_nom_opt variable
+        extendable_links = [link for link in target_links if n.links.at[link, 'p_nom_extendable']]
+
+        # Also check for already fixed capacity in non-extendable links
+        fixed_links = [link for link in target_links if not n.links.at[link, 'p_nom_extendable']]
+        fixed_capacity = sum(n.links.at[link, 'p_nom'] for link in fixed_links)
+
+        logging.info(
+            f"[Storage capacity limits] Found {len(extendable_links)} extendable and {len(fixed_links)} fixed battery links")
+        logging.info(f"[Storage capacity limits] Fixed capacity: {fixed_capacity} MW")
+
+        if not extendable_links and fixed_capacity == 0:
+            logging.warning(
+                f"[Storage capacity limits] No extendable battery links found for {country} and no fixed capacity, skipping")
+            return
+
+        # Now add constraints
+        try:
+            # Adjust limits to account for fixed capacity
+            adjusted_min = min_capacity - fixed_capacity if min_capacity is not None else None
+            adjusted_max = max_capacity - fixed_capacity if max_capacity is not None else None
+
+            logging.info(f"[Storage capacity limits] Adjusted limits: min={adjusted_min} MW, max={adjusted_max} MW")
+
+            # Skip if no extendable links but fixed capacity satisfies constraints
+            if not extendable_links:
+                if (adjusted_min is None or adjusted_min <= 0) and (
+                        adjusted_max is None or fixed_capacity <= max_capacity):
+                    logging.info(
+                        f"[Storage capacity limits] Fixed capacity ({fixed_capacity} MW) satisfies constraints")
+                    return
+                else:
+                    logging.warning(
+                        f"[Storage capacity limits] Fixed capacity ({fixed_capacity} MW) doesn't satisfy constraints, but no extendable links found")
+                    return
+
+            # If min constraint is already satisfied by fixed capacity, set to 0
+            if adjusted_min is not None and adjusted_min <= 0:
+                logging.info(f"[Storage capacity limits] Minimum constraint already satisfied by fixed capacity")
+                adjusted_min = 0
+
+            # If max constraint is smaller than fixed capacity, issue warning
+            if adjusted_max is not None and adjusted_max < 0:
+                logging.warning(
+                    f"[Storage capacity limits] Maximum constraint ({max_capacity} MW) is smaller than fixed capacity ({fixed_capacity} MW)")
+                # We'll still apply the constraint, but it might be infeasible
+
+            # For minimum capacity: sum of p_nom_opt >= adjusted_min
+            if adjusted_min is not None and adjusted_min > 0:
+                min_cname = f"storage-capacity-min-{country}"
+                n.model.add_constraints(
+                    n.model["Link-p_nom"].loc[extendable_links].sum() >= adjusted_min,
+                    name=min_cname
+                )
+                logging.info(f"[Storage capacity limits] Added minimum capacity constraint: {adjusted_min} MW")
+
+            # For maximum capacity: sum of p_nom_opt <= adjusted_max
+            if adjusted_max is not None and adjusted_max >= 0:
+                max_cname = f"storage-capacity-max-{country}"
+                n.model.add_constraints(
+                    n.model["Link-p_nom"].loc[extendable_links].sum() <= adjusted_max,
+                    name=max_cname
+                )
+                logging.info(f"[Storage capacity limits] Added maximum capacity constraint: {adjusted_max} MW")
+
+            logging.info(f"[Storage capacity limits] Successfully added capacity constraints for {country}")
+
+            # Add a callback to check the final values after solving
+            def log_final_battery_capacity():
+                if n.links.p_nom_opt.empty:
+                    logging.info(f"[Storage capacity limits] No p_nom_opt attribute in results")
+                    return
+
+                # Calculate total battery capacity
+                total_extendable = 0
+                for link in extendable_links:
+                    if link in n.links.index and hasattr(n.links, 'p_nom_opt'):
+                        total_extendable += n.links.p_nom_opt.get(link, 0)
+
+                total_capacity = total_extendable + fixed_capacity
+                logging.info(
+                    f"[Storage capacity limits] Final battery capacity: {total_capacity} MW (extendable: {total_extendable} MW, fixed: {fixed_capacity} MW)")
+
+                if min_capacity is not None and total_capacity < min_capacity:
+                    logging.warning(
+                        f"[Storage capacity limits] Final capacity ({total_capacity} MW) is less than minimum ({min_capacity} MW)")
+
+                if max_capacity is not None and total_capacity > max_capacity:
+                    logging.warning(
+                        f"[Storage capacity limits] Final capacity ({total_capacity} MW) exceeds maximum ({max_capacity} MW)")
+
+            # Store the callback function to be called after solving
+            if not hasattr(n, 'post_solve_callbacks'):
+                n.post_solve_callbacks = []
+            n.post_solve_callbacks.append(log_final_battery_capacity)
+
+        except Exception as e:
+            logging.error(f"[Storage capacity limits] Error adding constraints: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+
+            # Try alternative approach using individual variables
+            try:
+                logging.info("[Storage capacity limits] Trying alternative approach...")
+
+                # Get p_nom variables for extendable links
+                p_nom_vars = n.model["Link-p_nom"]
+
+                # Create sum expression manually
+                sum_expr = sum(p_nom_vars.loc[link] for link in extendable_links)
+
+                # Add constraints
+                if adjusted_min is not None and adjusted_min > 0:
+                    n.model.add_constraints(sum_expr >= adjusted_min, name=f"storage-capacity-min-{country}-alt")
+                    logging.info(
+                        f"[Storage capacity limits] Added minimum capacity constraint (alt): {adjusted_min} MW")
+
+                if adjusted_max is not None and adjusted_max >= 0:
+                    n.model.add_constraints(sum_expr <= adjusted_max, name=f"storage-capacity-max-{country}-alt")
+                    logging.info(
+                        f"[Storage capacity limits] Added maximum capacity constraint (alt): {adjusted_max} MW")
+
+                logging.info(
+                    f"[Storage capacity limits] Successfully added capacity constraints using alternative approach")
+
+            except Exception as e2:
+                logging.error(f"[Storage capacity limits] Alternative approach also failed: {e2}")
+                import traceback
+                logging.error(traceback.format_exc())
+
+    except Exception as e:
+        logging.error(f"[Storage capacity limits] Error: {e}")
+        import traceback
+        logging.error(traceback.format_exc())
+
+    logging.info("[Storage capacity limits] Completed storage capacity limit constraint application")
+
+
 def extra_functionality(n, snapshots):
     """
     Collects supplementary constraints which will be passed to
     ``pypsa.optimization.optimize``.
-
-    If you want to enforce additional custom constraints, this is a good
-    location to add them. The arguments ``opts`` and
-    ``snakemake.config`` are expected to be attached to the network.
     """
     config = n.config
     constraints = config["solving"].get("constraints", {})
 
-    if constraints["BAU"] and n.generators.p_nom_extendable.any():
+    # Add renewable share constraints
+    add_renewable_share_constraints(n)
+
+    # Add storage capacity limits
+    add_storage_capacity_limits(n)
+
+    # Check if generators are extendable before applying certain constraints
+    has_extendable_generators = n.generators.p_nom_extendable.any()
+
+    if constraints.get("BAU", False) and has_extendable_generators:
         add_BAU_constraints(n, config)
 
-    if constraints["SAFE"] and n.generators.p_nom_extendable.any():
+    if constraints.get("SAFE", False) and has_extendable_generators:
         add_SAFE_constraints(n, config)
 
-    if constraints["CCL"] and n.generators.p_nom_extendable.any():
+    if constraints.get("CCL", False) and has_extendable_generators:
         add_CCL_constraints(n, config)
 
     # Add CLL constraints if enabled
-    if constraints.get("CLL", False):
-        add_CLL_constraints(n, config)
+    try:
+        cll_config = constraints.get("CLL", {})
+        if cll_config.get("apply_constraints", False):
+            logging.info("Applying CLL constraints for conventional generation...")
+            add_CLL_constraints(n, config)
+        else:
+            logging.info("CLL constraints disabled in config, skipping")
+    except Exception as e:
+        logging.error(f"Error applying CLL constraints: {e}")
+        # Decide whether to re-raise or continue
+        # raise
+
+    # DSM constraints
+    if config["sector"].get("dsm", {}).get("enable", False):
+        add_dsm_constraints(n, snapshots)
+
+    # Heat pump constraints
+    hp_enabled = False
+    possible_paths = [
+        config.get('solving', {}).get('constraints', {}).get('heat_pumps', {}),
+        config.get('constraints', {}).get('heat_pumps', {}),
+        config.get('heat_pumps', {})
+    ]
+
+    for path_config in possible_paths:
+        if path_config.get('apply_constraints', False):
+            hp_enabled = True
+            break
+
+    if hp_enabled:
+        logging.info("[Setup] Adding heat pump constraints")
+        add_heat_pump_constraints(n)
+    else:
+        logging.info("[Setup] Heat pump constraints disabled in config, skipping")
 
         # Add DSM-specific constraints if needed
         # (note: we're not adding DSM components here, just additional constraints if necessary)
@@ -2177,6 +3372,26 @@ def extra_functionality(n, snapshots):
         add_heat_pump_constraints(n)
     else:
         logging.info("[Setup] Heat pump constraints disabled in config, skipping")
+
+    # Add resistive heater constraints if enabled in config
+    # Try multiple paths for resistive heater configuration
+    rh_enabled = False
+    possible_paths = [
+        config.get('solving', {}).get('constraints', {}).get('resistive_heaters', {}),
+        config.get('constraints', {}).get('resistive_heaters', {}),
+        config.get('resistive_heaters', {})
+    ]
+
+    for path_config in possible_paths:
+        if path_config.get('apply_constraints', False):
+            rh_enabled = True
+            break
+
+    if rh_enabled:
+        logging.info("[Setup] Adding resistive heater constraints")
+        add_resistive_heater_constraints(n)
+    else:
+        logging.info("[Setup] Resistive heater constraints disabled in config, skipping")
 
     reserve = config["electricity"].get("operational_reserve", {})
     if reserve.get("activate"):
