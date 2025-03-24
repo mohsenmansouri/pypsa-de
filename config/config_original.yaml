@@ -4,10 +4,10 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: 20250310-NEP-gas
+  prefix: 20250319-mergemastermarch
   name:
   # - CurrentPolicies
-    - KN2045_Bal_v4
+  - KN2045_Bal_v4
   # - KN2045_Elec_v4
   # - KN2045_H2_v4
   # - KN2045plus_EasyRide
@@ -30,10 +30,6 @@ run:
     - build_industry_sector_ratios   # This is necessary to save build_industry_sector_ratios_data.log in the correct folder
     - modify_existing_heating
   disable_progressbar: true
-  debug_co2_limit: false
-  debug_h2deriv_limit: false
-  debug_unravel_oilbus: false
-  debug_unravel_gasbus: false
 
 iiasa_database:
   db_name: ariadne2_intern
@@ -63,17 +59,17 @@ scenario:
   ll:
   - vopt
   clusters:
-  - 49 #current options: 27, 49
+  - 27 #current options: 27, 49
   opts:
-  - ''
+  - '72'
   sector_opts:
-  - "3h"
+  - none
   planning_horizons:
-  #- 2020
-  - 2025
-  - 2030
+ # - 2020
+  #- 2025
+  #- 2030
   #- 2035
-  - 2040
+  #- 2040
   - 2045
 
 existing_capacities:
@@ -90,8 +86,6 @@ snapshots:
   start: "2019-01-01"
   end: "2020-01-01"
   inclusive: 'left'
-
-
 
 atlite:
   default_cutout: europe-2019-sarah3-era5
@@ -193,11 +187,7 @@ renewable:
 
 lines:
   dynamic_line_rating:
-    activate: true
     cutout: europe-2019-sarah3-era5
-    correction_factor: 0.95
-    max_voltage_difference: false
-    max_line_rating: false
 
 clustering:
   # simplify_network:
@@ -251,7 +241,7 @@ co2_budget:
   2030: 0.450 # 55% reduction by 2030 (Ff55)
   2035: 0.250
   2040: 0.100 # 90% by 2040
-  2045: 0.000 #0.050 climate-neutral by 2045
+  2045: 0.050
   2050: 0.000 # climate-neutral by 2050
 
 wasserstoff_kernnetz:
@@ -287,22 +277,9 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  chp:
+    enable: false # This should only deactivate the CHPs from prepare_sector_network, not those from add_existing_baseyear
   v2g: false
-  bev_dsm_restriction_value: 0.9      # Greater flexibility
-  bev_dsm_restriction_time: 5         # Shorter restriction time
-  transport_heating_deadband_upper: 22.0
-  transport_heating_deadband_lower: 13.0
-  ICE_lower_degree_factor: 0.4
-  ICE_upper_degree_factor: 1.8
-  EV_lower_degree_factor: 1.1
-  EV_upper_degree_factor: 0.7
-  bev_dsm: 2025                       # Earlier adoption of DSM
-  bev_availability: 0.7               # Higher availability
-  bev_energy: 0.08                    # More energy per vehicle
-  bev_charge_efficiency: 0.93         # Higher efficiency
-  bev_charge_rate: 0.015              # Faster charging
-  bev_avail_max: 0.98
-  bev_avail_mean: 0.85
   solar_thermal: false
   district_heating:
     potential: 0.3
@@ -351,10 +328,10 @@ sector:
   land_transport_electric_share:
     2020: 0.05
     2025: 0.15
-    2030: 0.35 #0.3
+    2030: 0.3
     2035: 0.45
-    2040: 0.75 #0.7
-    2045: 0.90 #0.85
+    2040: 0.7
+    2045: 0.85
     2050: 0.95
   land_transport_ice_share:
     2020: 0.9
@@ -950,51 +927,34 @@ solving:
 
     dsm:
       apply_constraints: true
-      s_util: 0.8             # Higher utilization factor
-      s_flex: 0.7             # Higher flexibility factor (70% of load can be shifted)
-      s_inc: 0.6              # Moderate increase factor (can increase load by 60%)
-      s_dec: 0.6              # Moderate decrease factor (can decrease load by 60%)
-      delta_t: 6              # Longer time shift (6 hours) for greater flexibility
+      s_util: 0.67            # Default utilization factor
+      s_flex: 0.5             # Default flexibility factor
+      s_inc: 1.0              # Default increase factor
+      s_dec: 0.0              # Default decrease factor
+      delta_t: 1              # Default time shift (hours)
       resample: 3             # Default resample factor
 
-      # Year-specific parameters - optimistic (beyond NEP B)
+      # Year-specific parameters for Scenario B
       year_parameters:
         "2020":
-          target_capacity: 1.2    # Slightly higher than baseline
-          delta_t: 3              # More flexible time shift
+          target_capacity: 1.1    #
 
         "2025":
-          target_capacity: 3.0    # More aggressive adoption
-          delta_t: 4              # More flexibility
-          s_flex: 0.65            # 65% of load can be shifted
+          target_capacity: 1.4    # From "Bestand 2022/2023" in the table
 
+        # B Scenario - 2037 values
         "2030":
-          target_capacity: 9.0    # 40% higher than NEP B
-          delta_t: 8              # More flexibility as technology matures
-          s_flex: 0.7             # 70% of load can be shifted
-          s_inc: 0.7              # Can increase load by 70%
-          s_dec: 0.7              # Can decrease load by 70%
+          target_capacity: 8.4 #6.4    # Estimated intermediate value
 
         "2035":
-          target_capacity: 13.0   # 44% higher than NEP B
-          delta_t: 12             # Significantly more time shifting
-          s_flex: 0.75            # 75% of load can be shifted
+          target_capacity: 10.0 #9.0    # Approximated from B 2037 value
 
+        # B Scenario - 2045 values
         "2040":
-          target_capacity: 17.0   # 45% higher than NEP B
-          delta_t: 16             # Extended time shifting capability
-          s_flex: 0.8             # 80% of load can be shifted
-          s_inc: 0.8              # Can increase load by 80%
-          s_dec: 0.8              # Can decrease load by 80%
+          target_capacity: 14.0 #11.7   # Interpolated between 2037 and 2045 values
 
         "2045":
-          target_capacity: 21.0   # 45% higher than NEP B
-          delta_t: 24             # Full day time shifting capability
-          s_flex: 0.85            # 85% of load can be shifted
-          s_inc: 0.9              # Can increase load by 90%
-          s_dec: 0.9              # Can decrease load by 90%
-          s_util: 0.9             # Higher utilization factor
-
+          target_capacity: 20.0 #14.5   # From the table for B 2045 (DSM Industry and GHD)
     efuel_export_ban: false
     limits_capacity_max:
       Generator:
@@ -1003,25 +963,25 @@ solving:
             2020: 54.5
             2025: 69
             2030: 115 # EEG2023 Ziel für 2030
-            2035: 145 # EEG2023 Ziel für 2040
-            2040: 159 #250
-            2045: 160 #250
+            2035: 160 # EEG2023 Ziel für 2040
+            2040: 250
+            2045: 250
         offwind:
           DE:
             2020: 7.8
             2025: 11.3
-            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2030: 29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
             2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
-            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
-            2045: 75.5 #70
+            2040: 65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 70
         solar:
           DE:
             2020: 53.7
             2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
-            2030: 215 #235 # PV Ziel 2030 + 20 GW
+            2030: 235 # PV Ziel 2030 + 20 GW
             2035: 400
-            2040: 366 #800
-            2045: 400 #1000
+            2040: 800
+            2045: 1000
       Store:
         co2 sequestered:
           DE:
@@ -1056,28 +1016,51 @@ solving:
       Generator:
         onwind:
           DE:
-            2020: 54.5
-            2025: 69
-            2030: 115 # EEG2023 Ziel für 2030
-            2035: 145 # EEG2023 Ziel für 2040
-            2040: 159 #250
-            2045: 160 #250
+            2030: 99    # Wind-an-Land Law 2028
+            2035: 115   # Wind-an-Land Law 2030
+            2040: 157   # target 2035
+            2045: 160   # target 2040
         offwind:
           DE:
-            2020: 7.8
-            2025: 11.3
-            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
-            2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
-            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
-            2045: 75.5 #70
+            2030: 22.5   # 75% Wind-auf-See Law
+            2035: 35
+            2040: 42
+            2045: 50
         solar:
           DE:
-            2020: 53.7
-            2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
-            2030: 215 #235 # PV Ziel 2030 + 20 GW
-            2035: 400
-            2040: 366 #800
-            2045: 400 #1000
+              # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
+              # assuming at least 1/3 of difference reached in 2025
+            2025: 101
+            2030: 101
+            2035: 101
+            2040: 101
+            2045: 101
+  # For reference, this are the values specified in the laws
+  # limits_capacity_min:
+  #     Generator:
+  #       onwind:
+  #         DE:
+  #           2030: 115 # Wind-an-Land Law
+  #           2035: 157 # Wind-an-Land Law
+  #           2040: 160 # Wind-an-Land Law
+  #           2045: 160
+  #       offwind:
+  #         DE:
+  #           2030: 30 # Wind-auf-See Law
+  #           2035: 40 # 40 Wind-auf-See Law
+  #           # assuming at least 1/3 of difference reached in 2040
+  #           2040: 50
+  #           2045: 70 #70 Wind-auf-See Law
+  #       solar:
+  #         DE:
+  #           # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
+  #           # assuming at least 1/3 of difference reached in 2025
+  #           2025: 101
+  #           2030: 215 # PV strategy
+  #           2035: 309
+  #           2040: 400 # PV strategy
+  #           2045: 400
+  #           # What about the EEG2023 "Strommengenpfad"?
     # boundary condition of maximum volumes
     limits_volume_max:
       # constrain electricity import in TWh
@@ -1086,55 +1069,54 @@ solving:
           2020: -20
           2025: 0
           2030: 0
-          2035: 0  # 10 #40
-          2040: 0  # 25 #80
-          2045: 0  # 50 #125
+          2035: 0
+          2040: 0
+          2045: 0
       electrolysis:
+      # boundary condition lower?
         DE:
           2020: 0
-          2025: 10     # More ambitious early deployment
-          2030: 60     # More ambitious early deployment
-          2035: 160    # Matches NEP C 2037 (160 TWh)
-          2040: 240    # Between C 2037 and C 2045
-          2045: 320    # Matches NEP C 2045 (320 TWh)
-      h2_derivate_import: # Fixed indentation - moved out from under electrolysis
+          2025: 5
+          2030: 45
+          2035: 130
+          2040: 215
+          2045: 300
+      h2_derivate_import:
+      # boundary condition lower?
         DE:
           2020: 0
-          2025: 5      # More ambitious early deployment
-          2030: 20     # More ambitious early deployment
-          2035: 120    # Original value, fits C scenario
-          2040: 220    # Higher than conservative
-          2045: 340    # Higher than conservative
-      h2_import: # Fixed indentation - moved out from under electrolysis
+          2025: 0
+          2030: 10
+          2035: 105
+          2040: 200
+          2045: 300
+      h2_import:
+      # boundary condition lower?
         DE:
           2020: 0
-          2025: 10     # More ambitious early deployment
-          2030: 25     # More ambitious early deployment
-          2035: 130    # Higher than conservative
-          2040: 240    # Higher than conservative
-          2045: 360    # Higher than conservative
-
-    limits_volume_min: # Fixed indentation - moved out to top level
+          2025: 5
+          2030: 15
+          2035: 115
+          2040: 220
+          2045: 325
+    limits_volume_min:
       electrolysis:
         DE:
           2020: 0
           2025: 0
-          2030: 10   # Minimum deployment requirements
-          2035: 80   # Minimum deployment requirements
-          2040: 160  # Minimum deployment requirements
-          2045: 240  # Minimum deployment requirements
-
-    limits_power_max: # Fixed indentation - moved out to top level
+          2030: 0
+          2035: 0
+          2040: 0
+          2045: 0
+    limits_power_max: # in GW
       DE:
         2020: 15
-        2025: 20     # More ambitious early deployment
-        2030: 90     # Higher than original
-        2035: 120    # Based on 160 TWh at ~1750 full load hours (assumes ~90% capacity factor, higher efficiency)
-        2040: 180    # Between 2035 and 2045 values
-        2045: 240    # Based on 320 TWh at ~1750 full load hours (higher than original value)
-
-  #solver:
-    #name: gurobi
+        2025: 15
+        2030: 20
+        2035: 25
+        2040: 30
+        2045: 35
+  # solver:
   #   options: gurobi-numeric-focus
   # solver_options:
   #   gurobi-default:
@@ -1182,11 +1164,6 @@ electricity:
     force: 2035
     cost_factor: 0.15 # repurposing cost of OCGT gas to H2 in % investment cost in EUR/MW source: Christidis et al (2023) - H2-Ready-Gaskraftwerke, Table 3 https://reiner-lemoine-institut.de/wp-content/uploads/2023/11/RLI-Studie-H2-ready_DE.pdf
     efficiency_loss: 0.05
-    #extendable_carriers:
-    #Generator: [ OCGT, CCGT ]
-    #StorageUnit: [ ] # battery, H2
-    #Store: [battery, H2]
-    #Link: [ ] # H2 pipeline
 
 pypsa_eur:
   Bus:

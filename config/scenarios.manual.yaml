@@ -133,16 +133,25 @@ KN2045_Bal_v4:
 # Importe erneuerbar erzeugter Energien auf mittlerem Niveau
 # dient als Referenzszenario in der Familie der Ariadne-Szenarien
 
+  run:
+    prefix: 20250310-NEP-gas
+
   iiasa_database:
     reference_scenario: KN2045_Bal_v4
     fallback_reference_scenario: KN2045_Bal_v4
   co2_budget_DE_source: KSG
+
+
 
   costs:
     horizon: "mean"
     NEP: 2023
     transmission: "overhead" # either overhead line ("overhead") or underground cable ("underground")
   solving:
+    agg_p_nom_limits:
+      agg_offwind: false
+      include_existing: true
+      file: data/agg_p_nom_minmax.csv
     constraints:
       # boundary condition of maximum volumes
       limits_volume_max:
@@ -194,6 +203,9 @@ KN2045_Bal_v4:
             DE:
               2030: 5
 
+
+
+
   industry:
     steam_biomass_fraction: 0.4
     steam_hydrogen_fraction: 0.3
@@ -216,6 +228,7 @@ KN2045_Elec_v4:
     transmission: "overhead" # either overhead line ("overhead") or underground cable ("underground")
   solving:
     constraints:
+      CLL: true
       limits_volume_max:
         # constrain electricity import in TWh
         electricity_import:
@@ -265,10 +278,15 @@ KN2045_Elec_v4:
             DE:
               2030: 5
 
+
+
+
   industry:
     steam_biomass_fraction: 0.4
     steam_hydrogen_fraction: 0.1
     steam_electricity_fraction: 0.5
+
+
 
 KN2045_H2_v4:
 # Fokus stärker auf dem Hochlauf von Technologien zur indirekten Elektrifizierung der Sektoren

@@ -63,7 +63,7 @@ scenario:
   ll:
   - vopt
   clusters:
-  - 49 #current options: 27, 49
+  - 27 #current options: 27, 49
   opts:
   - ''
   sector_opts:

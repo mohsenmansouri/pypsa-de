@@ -63,7 +63,7 @@ scenario:
   ll:
   - vopt
   clusters:
-  - 49 #current options: 27, 49
+  - 27 #current options: 27, 49
   opts:
   - ''
   sector_opts:
@@ -193,11 +193,7 @@ renewable:
 
 lines:
   dynamic_line_rating:
-    activate: true
     cutout: europe-2019-sarah3-era5
-    correction_factor: 0.95
-    max_voltage_difference: false
-    max_line_rating: false
 
 clustering:
   # simplify_network:
@@ -287,22 +283,24 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+
   v2g: false
-  bev_dsm_restriction_value: 0.9      # Greater flexibility
-  bev_dsm_restriction_time: 5         # Shorter restriction time
-  transport_heating_deadband_upper: 22.0
-  transport_heating_deadband_lower: 13.0
-  ICE_lower_degree_factor: 0.4
-  ICE_upper_degree_factor: 1.8
-  EV_lower_degree_factor: 1.1
-  EV_upper_degree_factor: 0.7
-  bev_dsm: 2025                       # Earlier adoption of DSM
-  bev_availability: 0.7               # Higher availability
-  bev_energy: 0.08                    # More energy per vehicle
-  bev_charge_efficiency: 0.93         # Higher efficiency
-  bev_charge_rate: 0.015              # Faster charging
-  bev_avail_max: 0.98
-  bev_avail_mean: 0.85
+
+  bev_dsm_restriction_value: 0.75     # Limited flexibility
+  bev_dsm_restriction_time: 7         # Longer restriction time
+  transport_heating_deadband_upper: 20.0
+  transport_heating_deadband_lower: 15.0
+  ICE_lower_degree_factor: 0.375
+  ICE_upper_degree_factor: 1.6
+  EV_lower_degree_factor: 0.98
+  EV_upper_degree_factor: 0.63
+  bev_dsm: 2040                       # Later adoption of DSM
+  bev_availability: 0.5               # Lower availability
+  bev_energy: 0.05                    # Less energy per vehicle
+  bev_charge_efficiency: 0.9
+  bev_charge_rate: 0.011              # Slower charging
+  bev_avail_max: 0.95
+  bev_avail_mean: 0.8                 # Lower average availability
   solar_thermal: false
   district_heating:
     potential: 0.3
@@ -351,10 +349,10 @@ sector:
   land_transport_electric_share:
     2020: 0.05
     2025: 0.15
-    2030: 0.35 #0.3
+    2030: 0.3
     2035: 0.45
-    2040: 0.75 #0.7
-    2045: 0.90 #0.85
+    2040: 0.7
+    2045: 0.85
     2050: 0.95
   land_transport_ice_share:
     2020: 0.9
@@ -487,6 +485,12 @@ solving:
           urban central solid biomass CHP CC:
             min: 0
             max: 1000
+          H2 OCGT:
+            min: 0
+            max: 0
+          urban central H2 CHP:
+            min: 0
+            max: 0
 
         "2025":
           coal:
@@ -534,11 +538,11 @@ solving:
             min: 8000
             max: 8000
           CCGT:
-            min: 0
-            max: 50000
+            min: 32000
+            max: 32000
           OCGT:
-            min: 0
-            max: 20000
+            min: 2000
+            max: 2000
           biomass:
             min: 2000
             max: 2000
@@ -546,11 +550,11 @@ solving:
             min: 2000
             max: 2000
           urban central gas CHP:
-            min: 0
-            max: 15000
+            min: 8000
+            max: 8000
           urban central gas CHP CC:
-            min: 0
-            max: 15000
+            min: 7000
+            max: 7000
           urban central solid biomass CHP:
             min: 2000
             max: 2000
@@ -558,11 +562,11 @@ solving:
             min: 2000
             max: 2000
           H2 OCGT:
-            min: 0
-            max: 5000
+            min: 3000
+            max: 3000
           urban central H2 CHP:
-            min: 0
-            max: 5000
+            min: 3000
+            max: 3000
 
         "2035":
           coal:
@@ -572,11 +576,11 @@ solving:
             min: 2000
             max: 2000
           CCGT:
-            min: 0000
-            max: 500000
+            min: 50000
+            max: 80000
           OCGT:
-            min: 0000
-            max: 500000
+            min: 1000
+            max: 80000
           biomass:
             min: 8000
             max: 25000
@@ -584,16 +588,22 @@ solving:
             min: 8000
             max: 25000
           urban central gas CHP:
-            min: 0000
-            max: 500000
+            min: 18000
+            max: 35000
           urban central gas CHP CC:
-            min: 0000
-            max: 500000
+            min: 4000
+            max: 15000
           urban central solid biomass CHP:
             min: 4000
             max: 10000
           urban central solid biomass CHP CC:
             min: 2000
+            max: 5000
+          H2 OCGT:
+            min: 2000
+            max: 10000
+          urban central H2 CHP:
+            min: 1000
             max: 5000
 
         "2040":
@@ -604,11 +614,11 @@ solving:
             min: 0
             max: 0
           CCGT:
-            min: 0
-            max: 50000
+            min: 10000
+            max: 10000
           OCGT:
-            min: 0
-            max: 50000
+            min: 10000
+            max: 10000
           biomass:
             min: 1000
             max: 1000
@@ -616,11 +626,11 @@ solving:
             min: 1000
             max: 1000
           urban central gas CHP:
-            min: 0
-            max: 30000
+            min: 5000
+            max: 20000
           urban central gas CHP CC:
-            min: 0
-            max: 30000
+            min: 5000
+            max: 20000
           urban central solid biomass CHP:
             min: 1500
             max: 1500
@@ -628,11 +638,11 @@ solving:
             min: 1500
             max: 1500
           H2 OCGT:
-            min: 0
+            min: 5000
             max: 25000
           urban central H2 CHP:
-            min: 0
-            max: 50000
+            min: 5000
+            max: 25000
 
         "2045":
           coal:
@@ -642,11 +652,11 @@ solving:
             min: 0
             max: 0
           CCGT:
-            min: 0000
-            max: 500000
+            min: 0
+            max: 0
           OCGT:
-            min: 0000
-            max: 500000
+            min: 0
+            max: 0
           biomass:
             min: 1000
             max: 1000
@@ -654,11 +664,11 @@ solving:
             min: 1000
             max: 1000
           urban central gas CHP:
-            min: 0000
-            max: 500000
+            min: 0
+            max: 0
           urban central gas CHP CC:
-            min: 0000
-            max: 500000
+            min: 0
+            max: 0
           urban central solid biomass CHP:
             min: 1500
             max: 1500
@@ -666,15 +676,14 @@ solving:
             min: 1500
             max: 1500
           H2 OCGT:
-            min: 0
-            max: 100000
+            min: 25000
+            max: 25000
           urban central H2 CHP:
-            min: 0
-            max: 100000
-
+            min: 25000
+            max: 25000
     heat_pumps:
       apply_constraints: true
-      active_scenario: "optimistic"
+      active_scenario: "conservative"
       countries: [ "DE" ]
 
       scenarios:
@@ -816,6 +825,7 @@ solving:
             rural resistive heater: { max: 5000 }
             urban central resistive heater: { max: 5000 }
             urban decentral resistive heater: { max: 5000 }
+
     renewable_share:
       apply_constraints: false
 
@@ -885,8 +895,9 @@ solving:
             DE:
               min: 0.90  # Reduced from 0.90 to be more realistic with current config
               max: 0.90
+
     storage_capacity_limits:
-      apply_constraints: false
+      apply_constraints: true
 
       # List of carriers to consider for each battery type
       battery_types:
@@ -900,24 +911,24 @@ solving:
                 max: 4    # Maximum capacity in Germany (GW)
             2025:
               DE:
-                min: 1.5  # Minimum capacity in Germany (GW)
-                max: 15   # Maximum capacity in Germany (GW)
+                min: 2  # Minimum capacity in Germany (GW)
+                max: 2   # Maximum capacity in Germany (GW)
             2030:
               DE:
-                min: 4    # Minimum capacity in Germany (GW)
-                max: 30   # Maximum capacity in Germany (GW)
+                min: 8    # Minimum capacity in Germany (GW)
+                max: 8   # Maximum capacity in Germany (GW)
             2035:
               DE:
-                min: 8    # Minimum capacity in Germany (GW)
-                max: 45   # Maximum capacity in Germany (GW)
+                min: 10    # Minimum capacity in Germany (GW)
+                max: 10   # Maximum capacity in Germany (GW)
             2040:
               DE:
-                min: 65   # Minimum capacity in Germany (GW)
-                max: 65   # Maximum capacity in Germany (GW)
+                min: 19   # Minimum capacity in Germany (GW)
+                max: 19   # Maximum capacity in Germany (GW)
             2045:
               DE:
-                min: 80   # Minimum capacity in Germany (GW)
-                max: 80   # Maximum capacity in Germany (GW)
+                min: 36   # Minimum capacity in Germany (GW)
+                max: 36   # Maximum capacity in Germany (GW)
 
         home_batteries:
           carriers:
@@ -926,74 +937,66 @@ solving:
             2020:
               DE:
                 min: 0    # Minimum capacity in Germany (GW)
-                max: 1    # Maximum capacity in Germany (GW)
+                max: 0    # Maximum capacity in Germany (GW)
             2025:
               DE:
-                min: 0.5  # Minimum capacity in Germany (GW)
-                max: 5    # Maximum capacity in Germany (GW)
+                min: 0  # Minimum capacity in Germany (GW)
+                max: 0    # Maximum capacity in Germany (GW)
             2030:
               DE:
-                min: 1    # Minimum capacity in Germany (GW)
-                max: 10   # Maximum capacity in Germany (GW)
+                min: 0    # Minimum capacity in Germany (GW)
+                max: 0   # Maximum capacity in Germany (GW)
             2035:
               DE:
-                min: 2    # Minimum capacity in Germany (GW)
-                max: 15   # Maximum capacity in Germany (GW)
+                min: 0    # Minimum capacity in Germany (GW)
+                max: 0   # Maximum capacity in Germany (GW)
             2040:
               DE:
-                min: 15   # Minimum capacity in Germany (GW)
-                max: 15   # Maximum capacity in Germany (GW)
+                min: 0   # Minimum capacity in Germany (GW)
+                max: 0   # Maximum capacity in Germany (GW)
             2045:
               DE:
-                min: 20   # Minimum capacity in Germany (GW)
-                max: 20   # Maximum capacity in Germany (GW)
-
+                min: 0   # Minimum capacity in Germany (GW)
+                max: 0   # Maximum capacity in Germany (GW)
     dsm:
       apply_constraints: true
-      s_util: 0.8             # Higher utilization factor
-      s_flex: 0.7             # Higher flexibility factor (70% of load can be shifted)
-      s_inc: 0.6              # Moderate increase factor (can increase load by 60%)
-      s_dec: 0.6              # Moderate decrease factor (can decrease load by 60%)
-      delta_t: 6              # Longer time shift (6 hours) for greater flexibility
+      s_util: 0.7             # Slightly increased utilization factor
+      s_flex: 0.6             # Increased flexibility factor (60% of load can be shifted)
+      s_inc: 0.5              # Decreased increase factor (can increase load by 50%)
+      s_dec: 0.5              # Added decrease factor (can decrease load by 50%)
+      delta_t: 4              # Increased time shift to 4 hours for more flexibility
       resample: 3             # Default resample factor
 
-      # Year-specific parameters - optimistic (beyond NEP B)
+      # Year-specific parameters - conservative (NEP B scenario)
       year_parameters:
         "2020":
-          target_capacity: 1.2    # Slightly higher than baseline
-          delta_t: 3              # More flexible time shift
+          target_capacity: 1.1    # From "Bestand 2022/2023" in the table
+          delta_t: 2              # Limited time shift in early years
 
         "2025":
-          target_capacity: 3.0    # More aggressive adoption
-          delta_t: 4              # More flexibility
-          s_flex: 0.65            # 65% of load can be shifted
+          target_capacity: 1.4    # Estimated intermediate value
+          delta_t: 3              # Slightly more flexibility
 
         "2030":
-          target_capacity: 9.0    # 40% higher than NEP B
-          delta_t: 8              # More flexibility as technology matures
-          s_flex: 0.7             # 70% of load can be shifted
-          s_inc: 0.7              # Can increase load by 70%
-          s_dec: 0.7              # Can decrease load by 70%
+          target_capacity: 6.4    # Estimated intermediate value
+          delta_t: 4              # More flexibility as technology matures
 
         "2035":
-          target_capacity: 13.0   # 44% higher than NEP B
-          delta_t: 12             # Significantly more time shifting
-          s_flex: 0.75            # 75% of load can be shifted
+          target_capacity: 9.0    # Approximated from B 2037 value
+          delta_t: 6              # Increased time shift capability
+          s_flex: 0.65            # Slightly more flexibility
 
         "2040":
-          target_capacity: 17.0   # 45% higher than NEP B
-          delta_t: 16             # Extended time shifting capability
-          s_flex: 0.8             # 80% of load can be shifted
-          s_inc: 0.8              # Can increase load by 80%
-          s_dec: 0.8              # Can decrease load by 80%
+          target_capacity: 11.7   # Interpolated between 2037 and 2045 values
+          delta_t: 8              # More time shifting capability
+          s_flex: 0.7             # More flexibility
 
         "2045":
-          target_capacity: 21.0   # 45% higher than NEP B
-          delta_t: 24             # Full day time shifting capability
-          s_flex: 0.85            # 85% of load can be shifted
-          s_inc: 0.9              # Can increase load by 90%
-          s_dec: 0.9              # Can decrease load by 90%
-          s_util: 0.9             # Higher utilization factor
+          target_capacity: 14.5   # From the table for B 2045 (DSM Industry and GHD)
+          delta_t: 12             # Significantly more time shifting capability
+          s_flex: 0.75            # Higher flexibility (75% of load can be shifted)
+          s_inc: 0.6              # Can increase load by 60%
+          s_dec: 0.6              # Can decrease load by 60%
 
     efuel_export_ban: false
     limits_capacity_max:
@@ -1086,55 +1089,54 @@ solving:
           2020: -20
           2025: 0
           2030: 0
-          2035: 0  # 10 #40
-          2040: 0  # 25 #80
-          2045: 0  # 50 #125
+          2035: 0  # 40
+          2040: 0  # 80
+          2045: 0  # 125
       electrolysis:
         DE:
           2020: 0
-          2025: 10     # More ambitious early deployment
-          2030: 60     # More ambitious early deployment
-          2035: 160    # Matches NEP C 2037 (160 TWh)
-          2040: 240    # Between C 2037 and C 2045
-          2045: 320    # Matches NEP C 2045 (320 TWh)
-      h2_derivate_import: # Fixed indentation - moved out from under electrolysis
+          2025: 5
+          2030: 45
+          2035: 120    # Approaching B 2037 value (140 TWh)
+          2040: 190    # Between B 2037 and B 2045
+          2045: 260    # Matches NEP B 2045 (260 TWh)
+      h2_derivate_import: # Note: indentation fixed, this is now a direct child of limits_volume_max
         DE:
           2020: 0
-          2025: 5      # More ambitious early deployment
-          2030: 20     # More ambitious early deployment
-          2035: 120    # Original value, fits C scenario
-          2040: 220    # Higher than conservative
-          2045: 340    # Higher than conservative
-      h2_import: # Fixed indentation - moved out from under electrolysis
+          2025: 0
+          2030: 10
+          2035: 90     # Reduced to align with B scenario
+          2040: 170
+          2045: 260    # Reduced to align with B scenario
+      h2_import: # Note: indentation fixed, this is now a direct child of limits_volume_max
         DE:
           2020: 0
-          2025: 10     # More ambitious early deployment
-          2030: 25     # More ambitious early deployment
-          2035: 130    # Higher than conservative
-          2040: 240    # Higher than conservative
-          2045: 360    # Higher than conservative
+          2025: 5
+          2030: 15
+          2035: 100    # Reduced to align with B scenario
+          2040: 190
+          2045: 280    # Reduced to align with B scenario
 
-    limits_volume_min: # Fixed indentation - moved out to top level
+    limits_volume_min: # Note: indentation fixed, this is now at top level
       electrolysis:
         DE:
           2020: 0
           2025: 0
-          2030: 10   # Minimum deployment requirements
-          2035: 80   # Minimum deployment requirements
-          2040: 160  # Minimum deployment requirements
-          2045: 240  # Minimum deployment requirements
+          2030: 0
+          2035: 0
+          2040: 0
+          2045: 0
 
-    limits_power_max: # Fixed indentation - moved out to top level
+    limits_power_max: # Note: indentation fixed, this is now at top level
       DE:
         2020: 15
-        2025: 20     # More ambitious early deployment
-        2030: 90     # Higher than original
-        2035: 120    # Based on 160 TWh at ~1750 full load hours (assumes ~90% capacity factor, higher efficiency)
-        2040: 180    # Between 2035 and 2045 values
-        2045: 240    # Based on 320 TWh at ~1750 full load hours (higher than original value)
+        2025: 15
+        2030: 60     # Reduced to align with B scenario
+        2035: 80     # Based on 140 TWh at ~1750 full load hours
+        2040: 110    # Between 2035 and 2045 values
+        2045: 150    # Based on 260 TWh at ~1750 full load hours
 
-  #solver:
-    #name: gurobi
+  # solver:
   #   options: gurobi-numeric-focus
   # solver_options:
   #   gurobi-default:
@@ -1182,8 +1184,8 @@ electricity:
     force: 2035
     cost_factor: 0.15 # repurposing cost of OCGT gas to H2 in % investment cost in EUR/MW source: Christidis et al (2023) - H2-Ready-Gaskraftwerke, Table 3 https://reiner-lemoine-institut.de/wp-content/uploads/2023/11/RLI-Studie-H2-ready_DE.pdf
     efficiency_loss: 0.05
-    #extendable_carriers:
-    #Generator: [ OCGT, CCGT ]
+    extendable_carriers:
+    Generator: [ OCGT, CCGT ]
     #StorageUnit: [ ] # battery, H2
     #Store: [battery, H2]
     #Link: [ ] # H2 pipeline

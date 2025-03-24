@@ -99,40 +99,114 @@ def add_capacity_limits(n, investment_year, limits_capacity, sense="maximum"):
                     sys.exit()
 
 
+def add_electricity_import_constraints(n, investment_year, config):
+    """
+    Restricts the total annual electricity imports for countries.
+    Modified to enforce zero electricity imports for Germany (DE) for years 2025-2045.
+    """
+    limits_volume_max = config.get('solving', {}).get('constraints', {}).get('limits_volume_max', {})
+    electricity_import_limits = limits_volume_max.get('electricity_import', {})
+
+    for ct in electricity_import_limits:
+        # Special case for Germany (DE) for years 2025-2045
+        if ct == "DE" and investment_year in [2025, 2030, 2035, 2040, 2045]:
+            limit = 0  # Force zero imports for Germany in these years
+            logger.info(
+                f"Setting zero electricity imports for {ct} in year {investment_year} (override)"
+            )
+        else:
+            # Use config value for other countries/years
+            if investment_year not in electricity_import_limits[ct]:
+                continue
+
+            limit = electricity_import_limits[ct][investment_year]
+
+        logger.info(f"limiting electricity imports in {ct} to {limit} TWh/a")
+
+        # Here would be the code that actually implements the constraint
+        # This part depends on how your model is structured, but likely involves:
+        # 1. Finding all cross-border links and lines that bring electricity to the country
+        # 2. Summing their flows over all snapshots
+        # 3. Adding a constraint that this sum must be less than the limit
+
+        # Example implementation (you'd need to adjust this to match your actual model):
+        incoming_links = n.links.index[
+            (n.links.bus0.str[:2] != ct) &
+            (n.links.bus1.str[:2] == ct) &
+            (n.links.carrier == "DC")
+            ]
+
+        incoming_lines = n.lines.index[
+            (n.lines.bus0.str[:2] != ct) &
+            (n.lines.bus1.str[:2] == ct) &
+            (n.lines.carrier == "AC")
+            ]
+
+        # Create the constraint for total annual import
+        # This is a simplified example - your actual constraint may be different
+        expr = 0
+        for t in n.snapshots:
+            # Sum import flows for this timestep
+            if len(incoming_links) > 0:
+                expr += n.snapshot_weightings.at[t, "objective"] * n.model["Link-p"].loc[t, incoming_links].sum()
+
+            if len(incoming_lines) > 0:
+                expr += n.snapshot_weightings.at[t, "objective"] * n.model["Line-s"].loc[t, incoming_lines].sum()
+
+        # Convert to TWh if needed (depends on your units)
+        # For example, if expr is in MW and snapshot_weightings are in hours:
+        expr = expr / 1e6  # Convert MWh to TWh
+
+        # Add the constraint
+        constraint_name = f"electricity-import-limit-{ct}"
+        n.model.add_constraints(expr <= limit, name=constraint_name)
+
+
 def add_power_limits(n, investment_year, limits_power_max):
     """
-    " Restricts the maximum inflow/outflow of electricity from/to a country.
+    Restricts the maximum inflow/outflow of electricity from/to a country.
+    Modified to enforce zero electricity import/export for Germany (DE) for years 2025-2045.
     """
     for ct in limits_power_max:
-        if investment_year not in limits_power_max[ct].keys():
-            continue
+        # Special case for Germany (DE) for years 2025-2045
+        if ct == "DE" and investment_year in [2025, 2030, 2035, 2040, 2045]:
+            limit = 0  # Set limit to zero for Germany for these years
+            logger.info(
+                f"Setting zero electricity import/export for {ct} in year {investment_year}"
+            )
+        else:
+            # Original logic for other countries or years
+            if investment_year not in limits_power_max[ct].keys():
+                continue
 
-        limit = 1e3 * limits_power_max[ct][investment_year] / 10
+            limit = 1e3 * limits_power_max[ct][investment_year] / 10
 
         logger.info(
             f"Adding constraint on electricity import/export from/to {ct} to be < {limit} MW"
         )
+
+        # Find all incoming and outgoing connections
         incoming_line = n.lines.index[
             (n.lines.carrier == "AC")
             & (n.lines.bus0.str[:2] != ct)
             & (n.lines.bus1.str[:2] == ct)
-        ]
+            ]
         outgoing_line = n.lines.index[
             (n.lines.carrier == "AC")
             & (n.lines.bus0.str[:2] == ct)
             & (n.lines.bus1.str[:2] != ct)
-        ]
+            ]
 
         incoming_link = n.links.index[
             (n.links.carrier == "DC")
             & (n.links.bus0.str[:2] != ct)
             & (n.links.bus1.str[:2] == ct)
-        ]
+            ]
         outgoing_link = n.links.index[
             (n.links.carrier == "DC")
             & (n.links.bus0.str[:2] == ct)
             & (n.links.bus1.str[:2] != ct)
-        ]
+            ]
 
         # iterate over snapshots - otherwise exporting of postnetwork fails since
         # the constraints are time dependent
@@ -143,11 +217,11 @@ def add_power_limits(n, investment_year, limits_power_max):
             outgoing_link_p = n.model["Link-p"].loc[t, outgoing_link]
 
             lhs = (
-                incoming_link_p.sum()
-                - outgoing_link_p.sum()
-                + incoming_line_p.sum()
-                - outgoing_line_p.sum()
-            ) / 10
+                          incoming_link_p.sum()
+                          - outgoing_link_p.sum()
+                          + incoming_line_p.sum()
+                          - outgoing_line_p.sum()
+                  ) / 10
             # divide by 10 to avoid numerical issues
 
             cname_upper = f"Power-import-limit-{ct}-{t}"

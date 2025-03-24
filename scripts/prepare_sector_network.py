@@ -1358,6 +1358,8 @@ def insert_electricity_distribution_grid(n, costs):
         overnight_cost=costs.at["electricity distribution grid", "investment"],
     )
 
+
+
     # deduct distribution losses from electricity demand as these are included in total load
     # https://nbviewer.org/github/Open-Power-System-Data/datapackage_timeseries/blob/2020-10-06/main.ipynb
     if (
