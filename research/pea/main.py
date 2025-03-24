@@ -164,6 +164,8 @@ class Pea:
 
             currentDf = df[dfIndexs]
 
+
+
             if len(currentDf) > 0:
                 if resultDf is None:
                     resultDf = currentDf
@@ -171,8 +173,8 @@ class Pea:
                     if resultDf is not None:
                         common_indexes = resultDf.index.intersection(currentDf.index)
                         if not common_indexes.empty:
-                            raise "common indexes"
-
+                           currentDf = None
+                            # raise "common indexes"
                     resultDf = pd.concat([resultDf, currentDf], axis=0)
         group = Grouper(self.n, resultDf, self.config)
         return group

@@ -6,7 +6,7 @@ c_e_PHS = ['PHS']
 c_power = ['AC', 'DC']
 c_battery = ['battery', 'home battery']
 
-c_pg_natgas = ['urban central gas CHP CC', 'urban central gas CHP']
+c_pg_natgas = ['urban central gas CHP CC', 'urban central gas CHP', 'CCGT', 'OCGT']
 c_pg_h2 = ['H2 Fuel Cell', 'H2 OCGT']
 c_pg_retrofit_h2 = ['H2 retrofit OCGT', 'urban central H2 retrofit CHP']
 
