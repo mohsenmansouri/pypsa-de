@@ -21,6 +21,8 @@ from networkx.algorithms import complement
 from networkx.algorithms.connectivity.edge_augmentation import k_edge_augmentation
 from pypsa.geo import haversine_pts
 from scipy.stats import beta
+import re
+
 
 from scripts._helpers import (
     configure_logging,
@@ -1464,6 +1466,152 @@ def insert_electricity_distribution_grid(n, costs):
         lifetime=costs.at["battery inverter", "lifetime"],
     )
 
+# def add_low_voltage_dsm (n, config, planning_horizons, sector_opts):
+#     year_config = config.get(planning_horizons, None)
+#     opts = re.findall(r'\d+', sector_opts)
+#     resample =  int(opts[0])
+#     n.add(
+#         "Carrier",
+#         "DSM"
+#     )
+#     if year_config == None:
+#         return
+#     for demand_type in year_config:
+#         demaind_config = year_config[demand_type]
+
+#         s_util = demaind_config['s_util']
+#         s_flex = demaind_config['s_flex']
+#         s_inc = demaind_config['s_inc']
+#         s_dec = demaind_config['s_dec']
+#         delta_t =  demaind_config['delta_t']
+        
+#         nodes = n.loads[(n.loads['carrier'] == 'electricity') & (n.loads.index.str.startswith('DE'))].index
+
+#         load_p_t = n.loads_t['p_set'][nodes]
+
+#         l_t = s_flex * load_p_t
+#         lam = load_p_t.sum() * s_flex * resample / (8760 * s_util)
+
+#         p_max_t = lam * s_inc - l_t
+#         p_min_t = -(l_t - lam * s_dec)
+
+#         p_max_pu = p_max_t.clip(lower=0).div(lam) 
+#         p_min_pu = p_min_t.clip(upper=0).div(lam)
+
+#         name =  " " + demand_type + ' DSM'
+
+#         p_max_pu_df = p_max_pu.add_suffix(name)
+#         p_min_pu_df = p_min_pu.add_suffix(name)
+#         lam.index = lam.index.map(lambda x: x + name)
+
+       
+#         n.add(
+#             "StorageUnit",
+#             nodes + " " + demand_type + ' DSM',
+#             bus =  nodes + " low voltage",
+#             carrier =  "DSM",
+#             max_hours = delta_t,
+#             p_nom_max = lam,
+#             p_nom_extendable = True,
+#             p_max_pu = p_max_pu_df,
+#             p_min_pu = p_min_pu_df,
+#             cyclic_state_of_charge = True
+#         )
+
+def add_low_voltage_dsm (n, config, planning_horizons, sector_opts):
+    year_config = config.get(planning_horizons, None)
+    opts = re.findall(r'\d+', sector_opts)
+    resample =  int(opts[0])
+    n.add(
+        "Carrier",
+        "DSM"
+    )
+    if year_config == None:
+        return
+    location_names = pop_layout.index[pop_layout.index.str.startswith('DE')]
+    dsm_bus_names = location_names + " DSM"
+
+    n.add(
+        'Bus',
+        dsm_bus_names,
+        location = location_names,
+        carrier = "DSM",
+        unit="MWh_el",
+        )
+
+    for demand_type in year_config:
+        
+        demand_config = year_config[demand_type]
+
+        s_util = demand_config['s_util']
+        s_flex = demand_config['s_flex']
+        s_inc = demand_config['s_inc']
+        s_dec = demand_config['s_dec']
+        delta_t =  demand_config['delta_t']
+        
+        if demand_type == 'electricity':
+            demand_names = location_names
+            load_p_t = n.loads_t['p_set'][demand_names]
+        else:
+            demand_names = location_names + f" {demand_type}"
+            load_p_t = pd.DataFrame(index=n.snapshots)
+            for demand_name in demand_names:
+                load_p_t[demand_name] = n.loads.loc[demand_name]['p_set']
+
+        l_t = s_flex * load_p_t
+        lam = load_p_t.sum() * s_flex * resample / (8760 * s_util)
+
+
+        p_max_t = lam * s_inc - l_t
+        p_min_t = -(l_t - lam * s_dec)
+
+        p_max_pu = p_max_t.clip(lower=0).div(lam) 
+        p_min_pu = p_min_t.clip(upper=0).div(lam)
+
+        p_max_pu_df = p_max_pu
+        p_min_pu_df = p_min_pu
+        
+        lam.index = location_names + f" {demand_type} DSM"
+        n.add(
+            "Store",
+            location_names + f" {demand_type} DSM",
+            bus = dsm_bus_names,
+            carrier = "DSM" ,
+            e_cyclic = True,
+            e_nom = lam * delta_t
+        )
+
+        lam.index = location_names + f" {demand_type} DSM dispatch"
+        p_max_pu_df.columns = location_names + f" {demand_type} DSM dispatch"
+        p_min_pu_df.columns = location_names + f" {demand_type} DSM dispatch"
+
+        n.add(
+            "Link",
+            location_names + f" {demand_type} DSM dispatch",
+            bus0 = dsm_bus_names,
+            bus1 = location_names + " low voltage",
+            carrier= "DSM dispatch",
+            p_nom_max = lam,
+            p_nom_extendable = True,
+            p_max_pu = p_max_pu_df,
+            p_min_pu = p_min_pu_df,
+        )
+
+        lam.index = location_names + f" {demand_type} DSM store"
+        p_max_pu_df.columns = location_names + f" {demand_type} DSM store"
+        p_min_pu_df.columns = location_names + f" {demand_type} DSM store"
+
+        n.add(
+            "Link",
+            location_names + f" {demand_type} DSM store",
+            bus0 = location_names + " low voltage",
+            bus1 = dsm_bus_names,
+            carrier= "DSM store",
+            p_nom_max = lam,
+            p_nom_extendable = True,
+            p_max_pu = p_max_pu_df,
+            p_min_pu = p_min_pu_df,
+        )
 
 def insert_gas_distribution_costs(n, costs):
     # TODO options?
@@ -4951,6 +5099,13 @@ if __name__ == "__main__":
 
     if options["electricity_distribution_grid"]:
         insert_electricity_distribution_grid(n, costs)
+
+    for key, value in snakemake.wildcards.items():
+        print(f"{key}: {value}")
+  
+
+    if options.get('low_voltage_dsm') and options['low_voltage_dsm'].get("enable", False) and  isinstance(snakemake.wildcards.planning_horizons, str):
+        add_low_voltage_dsm(n, options['low_voltage_dsm'], snakemake.wildcards.planning_horizons, snakemake.wildcards.sector_opts)
 
     if options["enhanced_geothermal"].get("enable", False):
         logger.info("Adding Enhanced Geothermal Systems (EGS).")

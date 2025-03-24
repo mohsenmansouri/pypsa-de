@@ -98,6 +98,25 @@ def add_capacity_limits(n, investment_year, limits_capacity, sense="maximum"):
                     logger.error("sense {sense} not recognised")
                     sys.exit()
 
+def add_dsm_limits(n, investment_year):
+
+    max_p_dict = {
+        "2030": 6.4,
+        "2040": 11.9,
+        "2045": 12.9
+    }
+    max_p = max_p_dict[f"{investment_year}"] * 1e3 / 10
+    dsm_index = n.storage_units[(n.storage_units.index.str[:2] == 'DE') & (n.storage_units.carrier == "DSM")].index
+    for t in n.snapshots:
+        incoming_dispatch_p = n.model['StorageUnit-p_dispatch'].loc[t, dsm_index].sum() / 10
+        incoming_store_p = n.model['StorageUnit-p_store'].loc[t, dsm_index].sum() / 10
+
+        dispatch_name = f"dsm-limit-dispatch-{t}"
+        store_name = f"dsm-limit-store-{t}"
+
+        n.model.add_constraints(incoming_dispatch_p <= max_p, name=dispatch_name)
+        n.model.add_constraints(incoming_store_p <= max_p, name=store_name)
+
 
 def add_power_limits(n, investment_year, limits_power_max):
     """
@@ -733,7 +752,7 @@ def additional_functionality(n, snapshots, snakemake):
     )
 
     add_power_limits(n, investment_year, constraints["limits_power_max"])
-
+    # add_dsm_limits(n, investment_year)
     if int(snakemake.wildcards.clusters) != 1:
         h2_import_limits(n, investment_year, constraints["limits_volume_max"])
 

@@ -450,9 +450,9 @@ def prepare_network(
         add_co2_sequestration_limit(n, limit_dict=limit_dict)
 
         # Add DSM if enabled
-    if config["sector"].get("dsm", {}).get("enable", False):
-        logging.info("[Setup] Adding demand-side management")
-        n = add_dsm(n, config)  # Add DSM components
+    # if config["sector"].get("dsm", {}).get("enable", False):
+    #     logging.info("[Setup] Adding demand-side management")
+    #     n = add_dsm(n, config)  # Add DSM components
 
     return n
 
@@ -3326,8 +3326,8 @@ def extra_functionality(n, snapshots):
         # raise
 
     # DSM constraints
-    if config["sector"].get("dsm", {}).get("enable", False):
-        add_dsm_constraints(n, snapshots)
+    # if config["sector"].get("dsm", {}).get("enable", False):
+    #     add_dsm_constraints(n, snapshots)
 
     # Heat pump constraints
     hp_enabled = False
@@ -3348,10 +3348,10 @@ def extra_functionality(n, snapshots):
     else:
         logging.info("[Setup] Heat pump constraints disabled in config, skipping")
 
-        # Add DSM-specific constraints if needed
-        # (note: we're not adding DSM components here, just additional constraints if necessary)
-    if config["sector"].get("dsm", {}).get("enable", False):
-        add_dsm_constraints(n, snapshots)
+    # Add DSM-specific constraints if needed
+    # (note: we're not adding DSM components here, just additional constraints if necessary)
+    # if config["sector"].get("dsm", {}).get("enable", False):
+    #     add_dsm_constraints(n, snapshots)
 
         # Only add heat pump constraints if enabled in config
     # Try multiple paths for heat pump configuration
@@ -3539,6 +3539,13 @@ def solve_network(n, config, params, solving, **kwargs):
     )
     kwargs["assign_all_duals"] = cf_solving.get("assign_all_duals", False)
     kwargs["io_api"] = cf_solving.get("io_api", None)
+
+    if config['run'].get('quick_test', False):
+        start_date = '2019-01-15 00:00:00'
+        end_date = '2019-01-22 00:00:00'
+        selected_snapshots = n.snapshots[(n.snapshots >= start_date) & (n.snapshots <= end_date)]
+        kwargs['snapshots'] = selected_snapshots
+        n.snapshots = selected_snapshots
 
     if kwargs["solver_name"] == "gurobi":
         logging.getLogger("gurobipy").setLevel(logging.CRITICAL)

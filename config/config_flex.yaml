@@ -4,77 +4,16 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: 20250310-NEP-gas
-  name:
-  # - CurrentPolicies
-    - KN2045_Bal_v4
-  # - KN2045_Elec_v4
-  # - KN2045_H2_v4
-  # - KN2045plus_EasyRide
-  # - KN2045plus_LowDemand
-  # - KN2045minus_WorstCase
-  # - KN2045minus_SupplyFocus
-  # - KN2045_Bal_LowDemand
-  # - KN2045_Bal_HighDemand
-  scenarios:
-    enable: true
-    manual_file: config/scenarios.manual.yaml
-    file: config/scenarios.automated.yaml
-  shared_resources:
-    policy: base #stops recalculating
-    exclude:
-    - existing_heating.csv   # specify files which should not be shared between scenarios
-    - costs
-    - retrieve_cost   # This is necessary to save retrieve_cost_data_{year}.log in the correct folder
-    - industry_sector_ratios
-    - build_industry_sector_ratios   # This is necessary to save build_industry_sector_ratios_data.log in the correct folder
-    - modify_existing_heating
+  prefix: 20250310-NEP-flex
   disable_progressbar: true
   debug_co2_limit: false
   debug_h2deriv_limit: false
   debug_unravel_oilbus: false
   debug_unravel_gasbus: false
 
-iiasa_database:
-  db_name: ariadne2_intern
-  leitmodelle:
-    general: REMIND-EU v1.1
-    buildings: REMod v1.0
-    transport: Aladin v1
-    industry: FORECAST v1.0
-  scenarios:
-  - CurrentPolicies
-  - KN2045_Elec_v4
-  - KN2045_H2_v4
-  - KN2045_Bal_v4
-  - KN2045plus_EasyRide
-  - KN2045plus_LowDemand
-  - KN2045minus_WorstCase
-  - KN2045minus_SupplyFocus
-  reference_scenario: KN2045_Bal_v4
-  region: Deutschland
-
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
 foresight: myopic
 
-# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#scenario
-# Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
-scenario:
-  ll:
-  - vopt
-  clusters:
-  - 27 #current options: 27, 49
-  opts:
-  - ''
-  sector_opts:
-  - "3h"
-  planning_horizons:
-  #- 2020
-  #- 2025
-  - 2030
-  #- 2035
-  - 2040
-  - 2045
 
 existing_capacities:
   grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020]
@@ -193,7 +132,7 @@ renewable:
 
 lines:
   dynamic_line_rating:
-    activate: true
+    activate: false
     cutout: europe-2019-sarah3-era5
     correction_factor: 0.95
     max_voltage_difference: false
@@ -287,8 +226,67 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  low_voltage_dsm:
+    enable: true,
+    "2030":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.25
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.3
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+      agriculture electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+    "2040":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.3
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.3
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+      agriculture electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+    "2045":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.3
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+      agriculture electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
   dsm:
-    enable: true
+    enable: false
     active_scenario: "super_optimistic"  # Using super optimistic scenario
     minimum_utilization: 0.07            # Force 7% DSM usage
 
@@ -504,11 +502,204 @@ solving:
         H2 pipeline retrofitted: 0.05
       fractional_last_unit_size: true
   constraints:
-    CLL: true
+    CLL:
+      apply_constraints: true
+      generation_target_ranges:
+        "2020":
+          coal:
+            min: 20000
+            max: 20000
+          lignite:
+            min: 20000
+            max: 20000
+          CCGT:
+            min: 10000
+            max: 80000
+          OCGT:
+            min: 50
+            max: 5000
+          biomass:
+            min: 5000
+            max: 15000
+          solid biomass:
+            min: 5000
+            max: 15000
+          urban central gas CHP:
+            min: 15000
+            max: 20000
+          urban central gas CHP CC:
+            min: 0
+            max: 5000
+          urban central solid biomass CHP:
+            min: 2000
+            max: 5000
+          urban central solid biomass CHP CC:
+            min: 0
+            max: 1000
+
+        "2025":
+          coal:
+            min: 17000
+            max: 17000
+          lignite:
+            min: 17000
+            max: 17000
+          CCGT:
+            min: 10000
+            max: 80000
+          OCGT:
+            min: 50
+            max: 5000
+          biomass:
+            min: 6000
+            max: 18000
+          solid biomass:
+            min: 6000
+            max: 18000
+          urban central gas CHP:
+            min: 15000
+            max: 25000
+          urban central gas CHP CC:
+            min: 1000
+            max: 8000
+          urban central solid biomass CHP:
+            min: 2500
+            max: 6000
+          urban central solid biomass CHP CC:
+            min: 500
+            max: 2000
+
+        "2030":
+          coal:
+            min: 8000
+            max: 8000
+          lignite:
+            min: 8000
+            max: 8000
+          CCGT:
+            min: 15000
+            max: 80000
+          OCGT:
+            min: 15000
+            max: 80000
+          biomass:
+            min: 1000
+            max: 1000
+          solid biomass:
+            min: 1000
+            max: 1000
+          urban central gas CHP:
+            min: 15000
+            max: 30000
+          urban central gas CHP CC:
+            min: 2000
+            max: 10000
+          urban central solid biomass CHP:
+            min: 1500
+            max: 1500
+          urban central solid biomass CHP CC:
+            min: 1500
+            max: 1500
+
+        "2035":
+          coal:
+            min: 2000
+            max: 2000
+          lignite:
+            min: 2000
+            max: 2000
+          CCGT:
+            min: 50000
+            max: 80000
+          OCGT:
+            min: 1000
+            max: 80000
+          biomass:
+            min: 8000
+            max: 25000
+          solid biomass:
+            min: 8000
+            max: 25000
+          urban central gas CHP:
+            min: 18000
+            max: 35000
+          urban central gas CHP CC:
+            min: 4000
+            max: 15000
+          urban central solid biomass CHP:
+            min: 4000
+            max: 10000
+          urban central solid biomass CHP CC:
+            min: 2000
+            max: 5000
+
+        "2040":
+          coal:
+            min: 0
+            max: 0
+          lignite:
+            min: 0
+            max: 0
+          CCGT:
+            min: 25000
+            max: 80000
+          OCGT:
+            min: 25000
+            max: 80000
+          biomass:
+            min: 1000
+            max: 1000
+          solid biomass:
+            min: 1000
+            max: 1000
+          urban central gas CHP:
+            min: 20000
+            max: 40000
+          urban central gas CHP CC:
+            min: 5000
+            max: 20000
+          urban central solid biomass CHP:
+            min: 1000
+            max: 1000
+          urban central solid biomass CHP CC:
+            min: 1000
+            max: 1000
+
+        "2045":
+          coal:
+            min: 0
+            max: 0
+          lignite:
+            min: 0
+            max: 0
+          CCGT:
+            min: 25000
+            max: 80000
+          OCGT:
+            min: 25000
+            max: 80000
+          biomass:
+            min: 1000
+            max: 1000
+          solid biomass:
+            min: 1000
+            max: 1000
+          urban central gas CHP:
+            min: 20000
+            max: 40000
+          urban central gas CHP CC:
+            min: 5000
+            max: 20000
+          urban central solid biomass CHP:
+            min: 1000
+            max: 1000
+          urban central solid biomass CHP CC:
+            min: 1000
+            max: 1000
     heat_pumps:
       apply_constraints: true
       # Select which scenario to use (conservative, medium, or optimistic)
-      active_scenario: "optimistic"
+      active_scenario: "conservative"
       countries: ["DE"]
 
       scenarios:
@@ -591,26 +782,188 @@ solving:
             urban central air heat pump: { min: 1500, max: 7000 }
             urban decentral air heat pump: { min: 1500, max: 7000 }
           2030:
-            rural air heat pump: { min: 1500, max: 8000 }
-            rural ground heat pump: { min: 1000, max: 7000 }
-            urban central air heat pump: { min: 3000, max: 12000 }
-            urban decentral air heat pump: { min: 3000, max: 12000 }
+            rural air heat pump: { min: 1000, max: 1000 }
+            rural ground heat pump: { min: 1000, max: 1000 }
+            urban central air heat pump: { min: 1000, max: 1000 }
+            urban decentral air heat pump: { min: 2000, max: 2000 }
           2035:
             rural air heat pump: { min: 3000, max: 12000 }
             rural ground heat pump: { min: 2000, max: 10000 }
             urban central air heat pump: { min: 5000, max: 15000 }
             urban decentral air heat pump: { min: 5000, max: 15000 }
           2040:
-            rural air heat pump: { min: 4500, max: 4500 }
-            rural ground heat pump: { min: 3500, max: 3500 }
-            urban central air heat pump: { min: 8000, max: 8000 }
-            urban decentral air heat pump: { min: 8000, max: 8000 }
+            rural air heat pump: { min: 1500, max: 1500 }
+            rural ground heat pump: { min: 1500, max: 1500 }
+            urban central air heat pump: { min: 3000, max: 3000 }
+            urban decentral air heat pump: { min: 3000, max: 3000 }
           2045:
-            rural air heat pump: { min: 4500, max: 4500 }
-            rural ground heat pump: { min: 3500, max: 3500 }
-            urban central air heat pump: { min: 8000, max: 8000 }
-            urban decentral air heat pump: { min: 8000, max: 8000 }
+            rural air heat pump: { min: 1500, max: 1500 }
+            rural ground heat pump: { min: 1500, max: 1500 }
+            urban central air heat pump: { min: 3000, max: 3000 }
+            urban decentral air heat pump: { min: 3000, max: 3000 }
+    resistive_heaters:
+      apply_constraints: true
+      # Select which scenario to use
+      active_scenario: "restrictive"
+      countries: [ "DE" ]
 
+      scenarios:
+        restrictive:
+          # Severely restrict resistive heaters to prioritize heat pumps
+          2020:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2025:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2030:
+            rural resistive heater: { max: 200 }
+            urban central resistive heater: { max: 800 }
+            urban decentral resistive heater: { max: 800 }
+          2035:
+            rural resistive heater: { max: 1000 }
+            urban central resistive heater: { max: 1500 }
+            urban decentral resistive heater: { max: 1500 }
+          2040:
+            rural resistive heater: { max: 500 }
+            urban central resistive heater: { max: 1000 }
+            urban decentral resistive heater: { max: 1000 }
+          2045:
+            rural resistive heater: { max: 500 }
+            urban central resistive heater: { max: 1000 }
+            urban decentral resistive heater: { max: 1000 }
+
+        moderate:
+          # Moderate restrictions on resistive heaters
+          2020:
+            rural resistive heater: { max: 3000 }
+            urban central resistive heater: { max: 4000 }
+            urban decentral resistive heater: { max: 4000 }
+          2025:
+            rural resistive heater: { max: 3000 }
+            urban central resistive heater: { max: 4000 }
+            urban decentral resistive heater: { max: 4000 }
+          2030:
+            rural resistive heater: { max: 2500 }
+            urban central resistive heater: { max: 3500 }
+            urban decentral resistive heater: { max: 3500 }
+          2035:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2040:
+            rural resistive heater: { max: 500 }
+            urban central resistive heater: { max: 500 }
+            urban decentral resistive heater: { max: 500 }
+          2045:
+            rural resistive heater: { max: 500 }
+            urban central resistive heater: { max: 500 }
+            urban decentral resistive heater: { max: 500 }
+    renewable_share:
+      apply_constraints: true
+
+      # Explicitly renewable carriers
+      renewable_carriers:
+        - solar
+        - solar-hsat
+        - onwind
+        - offwind-ac
+        - offwind-dc
+        - offwind-float
+        - hydro
+        - ror  # Run of river hydro
+
+      # Explicitly non-renewable carriers
+      non_renewable_carriers:
+        - gas
+        - oil
+        - lignite
+        - coal
+        - nuclear
+        - OCGT
+        - CCGT
+        - urban central gas CHP
+        - urban central oil CHP
+        - waste CHP
+        - waste CHP CC
+
+      # Ambiguous carriers and whether they count as renewable
+      ambiguous_carriers:
+        battery: true           # Count battery discharge as renewable
+        PHS: true               # Count pumped hydro as renewable
+        H2: false               # Don't count hydrogen generation unless explicitly renewable
+
+      # Select which scenario to use
+      active_scenario: "target"
+
+      scenarios:
+        # Main target scenario with specific targets for each year
+        target:
+          2020:
+            DE:
+              min: 0.45  # At least 45% renewable in Germany
+              max: 0.60  # Maximum 60% renewable in Germany
+
+          2025:
+            DE:
+              min: 0.10
+              max: 0.50
+
+          2030:
+            DE:
+              min: 0.40
+              max: 0.60
+
+          2035:
+            DE:
+              min: 0.50
+              max: 0.70
+
+          2040:
+            DE:
+              min: 0.90  # Reduced from 0.90 to be more realistic with current config
+              max: 0.90
+
+          2045:
+            DE:
+              min: 0.90  # Reduced from 0.90 to be more realistic with current config
+              max: 0.90
+    storage_capacity_limits:
+      apply_constraints: true
+
+      # List of carriers to consider as battery storage
+      battery_carriers:
+        - battery
+        - home battery
+
+      # Limits for different years (in GW)
+      limits:
+        2020:
+          DE:
+            min: 0    # Minimum battery capacity in Germany (GW)
+            max: 5    # Maximum battery capacity in Germany (GW)
+        2025:
+          DE:
+            min: 2    # Minimum battery capacity in Germany (GW)
+            max: 20   # Maximum battery capacity in Germany (GW)
+        2030:
+          DE:
+            min: 5    # Minimum battery capacity in Germany (GW)
+            max: 40   # Maximum battery capacity in Germany (GW)
+        2035:
+          DE:
+            min: 10   # Minimum battery capacity in Germany (GW)
+            max: 60   # Maximum battery capacity in Germany (GW)
+        2040:
+          DE:
+            min: 80   # Minimum battery capacity in Germany (GW)
+            max: 80   # Maximum battery capacity in Germany (GW)
+        2045:
+          DE:
+            min: 100   # More realistic minimum (GW)
+            max: 100  # Maximum battery capacity in Germany (GW)
     efuel_export_ban: false
     limits_capacity_max:
       Generator:
@@ -620,24 +973,24 @@ solving:
             2025: 69
             2030: 115 # EEG2023 Ziel für 2030
             2035: 145 # EEG2023 Ziel für 2040
-            2040: 250
-            2045: 250
+            2040: 159 #250
+            2045: 160 #250
         offwind:
           DE:
             2020: 7.8
             2025: 11.3
-            2030: 29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
             2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
-            2040: 65   # Planned projects until 2040 -1.5 GW for potential retirments
-            2045: 70
+            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 75.5 #70
         solar:
           DE:
             2020: 53.7
             2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
-            2030: 235 # PV Ziel 2030 + 20 GW
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
             2035: 400
-            2040: 800
-            2045: 1000
+            2040: 366 #800
+            2045: 400 #1000
       Store:
         co2 sequestered:
           DE:
@@ -647,6 +1000,8 @@ solving:
             2035: 20000
             2040: 50000
             2045: 80000
+      
+
       Link:
         methanolisation:
           DE:
@@ -660,6 +1015,17 @@ solving:
             2035: 2.5
             2040: 2.5
             2045: 2.5
+        DSM dispatch:
+          DE:
+            2030: 6.4
+            2040: 11.9
+            2045: 12.9
+        DSM store:
+          DE:
+            2030: 6.4
+            2040: 11.9
+            2045: 12.9
+
         HVC to air:
           DE:
             2020: 0 # all HVC in Germany is either burned or recycled
@@ -672,25 +1038,39 @@ solving:
       Generator:
         onwind:
           DE:
-            2030: 99    # Wind-an-Land Law 2028
-            2035: 115   # Wind-an-Land Law 2030
-            2040: 157   # target 2035
-            2045: 160   # target 2040
+            2020: 54.5
+            2025: 69
+            2030: 115 # EEG2023 Ziel für 2030
+            2035: 145 # EEG2023 Ziel für 2040
+            2040: 159 #250
+            2045: 160 #250
         offwind:
           DE:
-            2030: 22.5   # 75% Wind-auf-See Law
-            2035: 35
-            2040: 42
-            2045: 50
+            2020: 7.8
+            2025: 11.3
+            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
+            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 75.5 #70
         solar:
           DE:
-            # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
-            # assuming at least 1/3 of difference reached in 2025
-            2025: 101
-            2030: 101
-            2035: 101
-            2040: 101
-            2045: 101
+            2020: 53.7
+            2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
+            2035: 400
+            2040: 366 #800
+            2045: 400 #1000
+      Link:
+        DSM dispatch:
+          DE:
+            2030: 6
+            2040: 11
+            2045: 12
+        DSM store:
+          DE:
+            2030: 6
+            2040: 11
+            2045: 12
     # boundary condition of maximum volumes
     limits_volume_max:
       # constrain electricity import in TWh
@@ -699,9 +1079,9 @@ solving:
           2020: -20
           2025: 0
           2030: 0
-          2035: 10 #40
-          2040: 25 #80
-          2045: 50 #125
+          2035: 0 #10 #40
+          2040: 0 #25 #80
+          2045: 0 #50 #125
       electrolysis:
         # boundary condition lower?
         DE:
@@ -715,20 +1095,20 @@ solving:
         # boundary condition lower?
         DE:
           2020: 0
-          2025: 10
-          2030: 30
-          2035: 150
-          2040: 250
-          2045: 350
+          2025: 0
+          2030: 10
+          2035: 105
+          2040: 200
+          2045: 300
       h2_import:
         # boundary condition lower?
         DE:
           2020: 0
-          2025: 15
-          2030: 45
-          2035: 180
-          2040: 300
-          2045: 425
+          2025: 5
+          2030: 15
+          2035: 115
+          2040: 220
+          2045: 325
     limits_volume_min:
       electrolysis:
         DE:
@@ -744,10 +1124,11 @@ solving:
         2025: 20
         2030: 30
         2035: 40
-        2040: 50
-        2045: 60
+        2040: 80 #50
+        2045: 100 #60
 
-  # solver:
+  #solver:
+    #name: gurobi
   #   options: gurobi-numeric-focus
   # solver_options:
   #   gurobi-default:
