@@ -70,7 +70,7 @@ scenario:
   - "3h"
   planning_horizons:
   #- 2020
-  #- 2025
+  - 2025
   - 2030
   #- 2035
   - 2040
@@ -251,7 +251,7 @@ co2_budget:
   2030: 0.450 # 55% reduction by 2030 (Ff55)
   2035: 0.250
   2040: 0.100 # 90% by 2040
-  2045: 0.050
+  2045: 0.000 #0.050 climate-neutral by 2045
   2050: 0.000 # climate-neutral by 2050
 
 wasserstoff_kernnetz:
@@ -287,73 +287,22 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  dsm:
-    enable: true
-    active_scenario: "super_optimistic"  # Using super optimistic scenario
-    minimum_utilization: 0.07            # Force 7% DSM usage
-
-    # Apply to all countries in the model
-    # countries: []  # Empty list means all countries
-
-    constraints:
-      time_restrictions:
-        enable: false          # No time restrictions
-      ramping_limit:
-        enable: true
-        value: 0.5             # 50% ramp limit (generous)
-
-    scenarios:
-      super_optimistic:
-        # Germany-specific configuration
-        DE:
-          tech_potential: 0.40        # 40% of load can be shifted (very high)
-          time_shifting: 24           # 24-hour shifting window (full day)
-          costs:
-            2025: { capital_cost: 30, storage_cost: 2, marginal_cost: 0.1 }
-            2030: { capital_cost: 20, storage_cost: 1, marginal_cost: 0.05 }
-            2035: { capital_cost: 15, storage_cost: 0.8, marginal_cost: 0.04 }
-            2040: { capital_cost: 10, storage_cost: 0.5, marginal_cost: 0.02 }
-            2045: { capital_cost: 5, storage_cost: 0.2, marginal_cost: 0.01 }
-          demand_types:
-            electricity:
-              sflex_modifier: 1.5     # Much higher flexibility
-              time_window_modifier: 2.0
-            industry_electricity:
-              sflex_modifier: 2.0     # Extremely high industry flexibility
-              time_window_modifier: 1.5
-            residential_electricity:
-              sflex_modifier: 1.5     # High residential flexibility
-              time_window_modifier: 2.0
-            commercial_electricity:
-              sflex_modifier: 2.0     # Very high commercial flexibility
-              time_window_modifier: 2.0
-            heat:
-              sflex_modifier: 2.0     # Very high heat flexibility
-              time_window_modifier: 3.0
-            agriculture_electricity:
-              sflex_modifier: 1.8     # High agricultural flexibility
-              time_window_modifier: 2.5
-            ev_charging: # Adding EV charging specifically
-              sflex_modifier: 2.5     # Extremely flexible EV charging
-              time_window_modifier: 3.0
-
-        # Default configuration for other countries
-        default:
-          tech_potential: 0.30        # 30% of load can be shifted
-          time_shifting: 18           # 18-hour shifting window
-          costs:
-            2025: { capital_cost: 35, storage_cost: 2.5, marginal_cost: 0.15 }
-            2030: { capital_cost: 25, storage_cost: 1.5, marginal_cost: 0.08 }
-            2035: { capital_cost: 18, storage_cost: 1.0, marginal_cost: 0.05 }
-            2040: { capital_cost: 12, storage_cost: 0.7, marginal_cost: 0.03 }
-            2045: { capital_cost: 8, storage_cost: 0.4, marginal_cost: 0.02 }
-          demand_types:
-            electricity: { sflex_modifier: 1.3, time_window_modifier: 1.8 }
-            industry_electricity: { sflex_modifier: 1.8, time_window_modifier: 1.4 }
-            heat: { sflex_modifier: 1.7, time_window_modifier: 2.5 }
-            ev_charging: { sflex_modifier: 2.2, time_window_modifier: 2.5 }
   v2g: false
-  bev_dsm: true
+  bev_dsm_restriction_value: 0.9      # Greater flexibility
+  bev_dsm_restriction_time: 5         # Shorter restriction time
+  transport_heating_deadband_upper: 22.0
+  transport_heating_deadband_lower: 13.0
+  ICE_lower_degree_factor: 0.4
+  ICE_upper_degree_factor: 1.8
+  EV_lower_degree_factor: 1.1
+  EV_upper_degree_factor: 0.7
+  bev_dsm: 2025                       # Earlier adoption of DSM
+  bev_availability: 0.7               # Higher availability
+  bev_energy: 0.08                    # More energy per vehicle
+  bev_charge_efficiency: 0.93         # Higher efficiency
+  bev_charge_rate: 0.015              # Faster charging
+  bev_avail_max: 0.98
+  bev_avail_mean: 0.85
   solar_thermal: false
   district_heating:
     potential: 0.3
@@ -504,16 +453,233 @@ solving:
         H2 pipeline retrofitted: 0.05
       fractional_last_unit_size: true
   constraints:
-    CLL: true
+    CLL:
+      apply_constraints: true
+      generation_target_ranges:
+        "2020":
+          coal:
+            min: 20000
+            max: 20000
+          lignite:
+            min: 20000
+            max: 20000
+          CCGT:
+            min: 10000
+            max: 80000
+          OCGT:
+            min: 50
+            max: 5000
+          biomass:
+            min: 5000
+            max: 15000
+          solid biomass:
+            min: 5000
+            max: 15000
+          urban central gas CHP:
+            min: 15000
+            max: 20000
+          urban central gas CHP CC:
+            min: 0
+            max: 5000
+          urban central solid biomass CHP:
+            min: 2000
+            max: 5000
+          urban central solid biomass CHP CC:
+            min: 0
+            max: 1000
+
+        "2025":
+          coal:
+            min: 17000
+            max: 17000
+          lignite:
+            min: 17000
+            max: 17000
+          CCGT:
+            min: 20000
+            max: 20000
+          OCGT:
+            min: 2000
+            max: 2000
+          biomass:
+            min: 3000
+            max: 3000
+          solid biomass:
+            min: 3000
+            max: 3000
+          urban central gas CHP:
+            min: 5000
+            max: 5000
+          urban central gas CHP CC:
+            min: 5000
+            max: 5000
+          urban central solid biomass CHP:
+            min: 3000
+            max: 3000
+          urban central solid biomass CHP CC:
+            min: 3000
+            max: 3000
+          H2 OCGT:
+            min: 0
+            max: 0
+          urban central H2 CHP:
+            min: 0
+            max: 0
+
+        "2030":
+          coal:
+            min: 8000
+            max: 8000
+          lignite:
+            min: 8000
+            max: 8000
+          CCGT:
+            min: 0
+            max: 50000
+          OCGT:
+            min: 0
+            max: 20000
+          biomass:
+            min: 2000
+            max: 2000
+          solid biomass:
+            min: 2000
+            max: 2000
+          urban central gas CHP:
+            min: 0
+            max: 15000
+          urban central gas CHP CC:
+            min: 0
+            max: 15000
+          urban central solid biomass CHP:
+            min: 2000
+            max: 2000
+          urban central solid biomass CHP CC:
+            min: 2000
+            max: 2000
+          H2 OCGT:
+            min: 0
+            max: 5000
+          urban central H2 CHP:
+            min: 0
+            max: 5000
+
+        "2035":
+          coal:
+            min: 2000
+            max: 2000
+          lignite:
+            min: 2000
+            max: 2000
+          CCGT:
+            min: 0000
+            max: 500000
+          OCGT:
+            min: 0000
+            max: 500000
+          biomass:
+            min: 8000
+            max: 25000
+          solid biomass:
+            min: 8000
+            max: 25000
+          urban central gas CHP:
+            min: 0000
+            max: 500000
+          urban central gas CHP CC:
+            min: 0000
+            max: 500000
+          urban central solid biomass CHP:
+            min: 4000
+            max: 10000
+          urban central solid biomass CHP CC:
+            min: 2000
+            max: 5000
+
+        "2040":
+          coal:
+            min: 0
+            max: 0
+          lignite:
+            min: 0
+            max: 0
+          CCGT:
+            min: 0
+            max: 50000
+          OCGT:
+            min: 0
+            max: 50000
+          biomass:
+            min: 1000
+            max: 1000
+          solid biomass:
+            min: 1000
+            max: 1000
+          urban central gas CHP:
+            min: 0
+            max: 30000
+          urban central gas CHP CC:
+            min: 0
+            max: 30000
+          urban central solid biomass CHP:
+            min: 1500
+            max: 1500
+          urban central solid biomass CHP CC:
+            min: 1500
+            max: 1500
+          H2 OCGT:
+            min: 0
+            max: 25000
+          urban central H2 CHP:
+            min: 0
+            max: 50000
+
+        "2045":
+          coal:
+            min: 0
+            max: 0
+          lignite:
+            min: 0
+            max: 0
+          CCGT:
+            min: 0000
+            max: 500000
+          OCGT:
+            min: 0000
+            max: 500000
+          biomass:
+            min: 1000
+            max: 1000
+          solid biomass:
+            min: 1000
+            max: 1000
+          urban central gas CHP:
+            min: 0000
+            max: 500000
+          urban central gas CHP CC:
+            min: 0000
+            max: 500000
+          urban central solid biomass CHP:
+            min: 1500
+            max: 1500
+          urban central solid biomass CHP CC:
+            min: 1500
+            max: 1500
+          H2 OCGT:
+            min: 0
+            max: 100000
+          urban central H2 CHP:
+            min: 0
+            max: 100000
+
     heat_pumps:
       apply_constraints: true
-      # Select which scenario to use (conservative, medium, or optimistic)
       active_scenario: "optimistic"
-      countries: ["DE"]
+      countries: [ "DE" ]
 
       scenarios:
-        conservative:
-          # Slower heat pump deployment
+        conservative: # Following NEP scenario B
+          # Previous years unchanged
           2020:
             rural air heat pump: { min: 0, max: 1000 }
             rural ground heat pump: { min: 0, max: 1000 }
@@ -534,52 +700,24 @@ solving:
             rural ground heat pump: { min: 800, max: 6000 }
             urban central air heat pump: { min: 2500, max: 10000 }
             urban decentral air heat pump: { min: 2500, max: 10000 }
+          # Updated based on NEP B 2037
           2040:
-            rural air heat pump: { min: 2500, max: 2500 }
-            rural ground heat pump: { min: 2000, max: 2000 }
-            urban central air heat pump: { min: 4500, max: 4500 }
-            urban decentral air heat pump: { min: 4500, max: 4500 }
+            # Total household heat pumps: 63.9 TWh / 2000h = ~32 GW
+            # Distributed across 4 types (with more weight to urban)
+            rural air heat pump: { min: 5500, max: 5500 }
+            rural ground heat pump: { min: 4500, max: 4500 }
+            urban central air heat pump: { min: 11000, max: 11000 }
+            urban decentral air heat pump: { min: 11000, max: 11000 }
+          # Updated based on NEP B 2045
           2045:
-            rural air heat pump: { min: 2500, max: 2500 }
-            rural ground heat pump: { min: 2000, max: 2000 }
-            urban central air heat pump: { min: 4500, max: 4500 }
-            urban decentral air heat pump: { min: 4500, max: 4500 }
+            # Total household heat pumps: 76.6 TWh / 2000h = ~38.3 GW
+            rural air heat pump: { min: 6500, max: 6500 }
+            rural ground heat pump: { min: 5500, max: 5500 }
+            urban central air heat pump: { min: 13150, max: 13150 }
+            urban decentral air heat pump: { min: 13150, max: 13150 }
 
-        medium:
-          # Current expectations for heat pump deployment
-          2020:
-            rural air heat pump: { min: 0, max: 1500 }
-            rural ground heat pump: { min: 0, max: 1500 }
-            urban central air heat pump: { min: 0, max: 2000 }
-            urban decentral air heat pump: { min: 0, max: 2000 }
-          2025:
-            rural air heat pump: { min: 500, max: 3500 }
-            rural ground heat pump: { min: 300, max: 3500 }
-            urban central air heat pump: { min: 1000, max: 5000 }
-            urban decentral air heat pump: { min: 1000, max: 5000 }
-          2030:
-            rural air heat pump: { min: 1000, max: 6000 }
-            rural ground heat pump: { min: 600, max: 5000 }
-            urban central air heat pump: { min: 2000, max: 10000 }
-            urban decentral air heat pump: { min: 2000, max: 10000 }
-          2035:
-            rural air heat pump: { min: 2000, max: 9000 }
-            rural ground heat pump: { min: 1000, max: 8000 }
-            urban central air heat pump: { min: 3000, max: 12000 }
-            urban decentral air heat pump: { min: 3000, max: 12000 }
-          2040:
-            rural air heat pump: { min: 3000, max: 3000 }
-            rural ground heat pump: { min: 2000, max: 2000 }
-            urban central air heat pump: { min: 6000, max: 6000 }
-            urban decentral air heat pump: { min: 6000, max: 6000 }
-          2045:
-            rural air heat pump: { min: 3000, max: 3000 }
-            rural ground heat pump: { min: 2000, max: 2000 }
-            urban central air heat pump: { min: 6000, max: 6000 }
-            urban decentral air heat pump: { min: 6000, max: 6000 }
-
-        optimistic:
-          # Accelerated heat pump deployment
+        optimistic: # More ambitious than NEP scenario B
+          # Previous years unchanged
           2020:
             rural air heat pump: { min: 0, max: 2000 }
             rural ground heat pump: { min: 0, max: 2000 }
@@ -591,8 +729,8 @@ solving:
             urban central air heat pump: { min: 1500, max: 7000 }
             urban decentral air heat pump: { min: 1500, max: 7000 }
           2030:
-            rural air heat pump: { min: 1500, max: 8000 }
-            rural ground heat pump: { min: 1000, max: 7000 }
+            rural air heat pump: { min: 1800, max: 8000 }
+            rural ground heat pump: { min: 1200, max: 7000 }
             urban central air heat pump: { min: 3000, max: 12000 }
             urban decentral air heat pump: { min: 3000, max: 12000 }
           2035:
@@ -600,16 +738,262 @@ solving:
             rural ground heat pump: { min: 2000, max: 10000 }
             urban central air heat pump: { min: 5000, max: 15000 }
             urban decentral air heat pump: { min: 5000, max: 15000 }
+          # ~25% higher than conservative for 2040
           2040:
-            rural air heat pump: { min: 4500, max: 4500 }
-            rural ground heat pump: { min: 3500, max: 3500 }
-            urban central air heat pump: { min: 8000, max: 8000 }
-            urban decentral air heat pump: { min: 8000, max: 8000 }
+            rural air heat pump: { min: 6900, max: 6900 }
+            rural ground heat pump: { min: 5600, max: 5600 }
+            urban central air heat pump: { min: 13750, max: 13750 }
+            urban decentral air heat pump: { min: 13750, max: 13750 }
+          # ~25% higher than conservative for 2045
           2045:
-            rural air heat pump: { min: 4500, max: 4500 }
-            rural ground heat pump: { min: 3500, max: 3500 }
-            urban central air heat pump: { min: 8000, max: 8000 }
-            urban decentral air heat pump: { min: 8000, max: 8000 }
+            rural air heat pump: { min: 8100, max: 8100 }
+            rural ground heat pump: { min: 6900, max: 6900 }
+            urban central air heat pump: { min: 16450, max: 16450 }
+            urban decentral air heat pump: { min: 16450, max: 16450 }
+
+    resistive_heaters:
+      apply_constraints: true
+      active_scenario: "restrictive"
+      countries: [ "DE" ]
+
+      scenarios:
+        restrictive: # Following NEP scenario B
+          # Previous years unchanged
+          2020:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2025:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2030:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          2035:
+            rural resistive heater: { max: 1000 }
+            urban central resistive heater: { max: 1500 }
+            urban decentral resistive heater: { max: 1500 }
+          # Updated based on NEP B 2037
+          2040:
+            # Total direct electric heating: 13.1 + 7.4 = 20.5 TWh / 1500h = ~13.7 GW
+            rural resistive heater: { max: 4500 }
+            urban central resistive heater: { max: 4600 }
+            urban decentral resistive heater: { max: 4600 }
+          # Updated based on NEP B 2045
+          2045:
+            # Total direct electric heating: 12.3 + 6.6 = 18.9 TWh / 1500h = ~12.6 GW
+            rural resistive heater: { max: 4200 }
+            urban central resistive heater: { max: 4200 }
+            urban decentral resistive heater: { max: 4200 }
+
+        moderate: # Less restrictive than NEP scenario B
+          # Previous years unchanged
+          2020:
+            rural resistive heater: { max: 3000 }
+            urban central resistive heater: { max: 4000 }
+            urban decentral resistive heater: { max: 4000 }
+          2025:
+            rural resistive heater: { max: 3000 }
+            urban central resistive heater: { max: 4000 }
+            urban decentral resistive heater: { max: 4000 }
+          2030:
+            rural resistive heater: { max: 2500 }
+            urban central resistive heater: { max: 3500 }
+            urban decentral resistive heater: { max: 3500 }
+          2035:
+            rural resistive heater: { max: 2000 }
+            urban central resistive heater: { max: 3000 }
+            urban decentral resistive heater: { max: 3000 }
+          # ~20% higher than restrictive for 2040
+          2040:
+            rural resistive heater: { max: 5400 }
+            urban central resistive heater: { max: 5500 }
+            urban decentral resistive heater: { max: 5500 }
+          # ~20% higher than restrictive for 2045
+          2045:
+            rural resistive heater: { max: 5000 }
+            urban central resistive heater: { max: 5000 }
+            urban decentral resistive heater: { max: 5000 }
+    renewable_share:
+      apply_constraints: false
+
+      # Explicitly renewable carriers
+      renewable_carriers:
+        - solar
+        - solar-hsat
+        - onwind
+        - offwind-ac
+        - offwind-dc
+        - offwind-float
+        - hydro
+        - ror  # Run of river hydro
+
+      # Explicitly non-renewable carriers
+      non_renewable_carriers:
+        - gas
+        - oil
+        - lignite
+        - coal
+        - nuclear
+        - OCGT
+        - CCGT
+        - urban central gas CHP
+        - urban central oil CHP
+        - waste CHP
+        - waste CHP CC
+
+      # Ambiguous carriers and whether they count as renewable
+      ambiguous_carriers:
+        battery: true           # Count battery discharge as renewable
+        PHS: true               # Count pumped hydro as renewable
+        H2: false               # Don't count hydrogen generation unless explicitly renewable
+
+      # Select which scenario to use
+      active_scenario: "target"
+
+      scenarios:
+        # Main target scenario with specific targets for each year
+        target:
+          2020:
+            DE:
+              min: 0.45  # At least 45% renewable in Germany
+              max: 0.60  # Maximum 60% renewable in Germany
+
+          2025:
+            DE:
+              min: 0.10
+              max: 0.50
+
+          2030:
+            DE:
+              min: 0.40
+              max: 0.60
+
+          2035:
+            DE:
+              min: 0.50
+              max: 0.70
+
+          2040:
+            DE:
+              min: 0.90  # Reduced from 0.90 to be more realistic with current config
+              max: 0.90
+
+          2045:
+            DE:
+              min: 0.90  # Reduced from 0.90 to be more realistic with current config
+              max: 0.90
+    storage_capacity_limits:
+      apply_constraints: false
+
+      # List of carriers to consider for each battery type
+      battery_types:
+        stationary_batteries:
+          carriers:
+            - battery
+          limits:
+            2020:
+              DE:
+                min: 0    # Minimum capacity in Germany (GW)
+                max: 4    # Maximum capacity in Germany (GW)
+            2025:
+              DE:
+                min: 1.5  # Minimum capacity in Germany (GW)
+                max: 15   # Maximum capacity in Germany (GW)
+            2030:
+              DE:
+                min: 4    # Minimum capacity in Germany (GW)
+                max: 30   # Maximum capacity in Germany (GW)
+            2035:
+              DE:
+                min: 8    # Minimum capacity in Germany (GW)
+                max: 45   # Maximum capacity in Germany (GW)
+            2040:
+              DE:
+                min: 65   # Minimum capacity in Germany (GW)
+                max: 65   # Maximum capacity in Germany (GW)
+            2045:
+              DE:
+                min: 80   # Minimum capacity in Germany (GW)
+                max: 80   # Maximum capacity in Germany (GW)
+
+        home_batteries:
+          carriers:
+            - home battery
+          limits:
+            2020:
+              DE:
+                min: 0    # Minimum capacity in Germany (GW)
+                max: 1    # Maximum capacity in Germany (GW)
+            2025:
+              DE:
+                min: 0.5  # Minimum capacity in Germany (GW)
+                max: 5    # Maximum capacity in Germany (GW)
+            2030:
+              DE:
+                min: 1    # Minimum capacity in Germany (GW)
+                max: 10   # Maximum capacity in Germany (GW)
+            2035:
+              DE:
+                min: 2    # Minimum capacity in Germany (GW)
+                max: 15   # Maximum capacity in Germany (GW)
+            2040:
+              DE:
+                min: 15   # Minimum capacity in Germany (GW)
+                max: 15   # Maximum capacity in Germany (GW)
+            2045:
+              DE:
+                min: 20   # Minimum capacity in Germany (GW)
+                max: 20   # Maximum capacity in Germany (GW)
+
+    dsm:
+      apply_constraints: true
+      s_util: 0.8             # Higher utilization factor
+      s_flex: 0.7             # Higher flexibility factor (70% of load can be shifted)
+      s_inc: 0.6              # Moderate increase factor (can increase load by 60%)
+      s_dec: 0.6              # Moderate decrease factor (can decrease load by 60%)
+      delta_t: 6              # Longer time shift (6 hours) for greater flexibility
+      resample: 3             # Default resample factor
+
+      # Year-specific parameters - optimistic (beyond NEP B)
+      year_parameters:
+        "2020":
+          target_capacity: 1.2    # Slightly higher than baseline
+          delta_t: 3              # More flexible time shift
+
+        "2025":
+          target_capacity: 3.0    # More aggressive adoption
+          delta_t: 4              # More flexibility
+          s_flex: 0.65            # 65% of load can be shifted
+
+        "2030":
+          target_capacity: 9.0    # 40% higher than NEP B
+          delta_t: 8              # More flexibility as technology matures
+          s_flex: 0.7             # 70% of load can be shifted
+          s_inc: 0.7              # Can increase load by 70%
+          s_dec: 0.7              # Can decrease load by 70%
+
+        "2035":
+          target_capacity: 13.0   # 44% higher than NEP B
+          delta_t: 12             # Significantly more time shifting
+          s_flex: 0.75            # 75% of load can be shifted
+
+        "2040":
+          target_capacity: 17.0   # 45% higher than NEP B
+          delta_t: 16             # Extended time shifting capability
+          s_flex: 0.8             # 80% of load can be shifted
+          s_inc: 0.8              # Can increase load by 80%
+          s_dec: 0.8              # Can decrease load by 80%
+
+        "2045":
+          target_capacity: 21.0   # 45% higher than NEP B
+          delta_t: 24             # Full day time shifting capability
+          s_flex: 0.85            # 85% of load can be shifted
+          s_inc: 0.9              # Can increase load by 90%
+          s_dec: 0.9              # Can decrease load by 90%
+          s_util: 0.9             # Higher utilization factor
 
     efuel_export_ban: false
     limits_capacity_max:
@@ -620,24 +1004,24 @@ solving:
             2025: 69
             2030: 115 # EEG2023 Ziel für 2030
             2035: 145 # EEG2023 Ziel für 2040
-            2040: 250
-            2045: 250
+            2040: 159 #250
+            2045: 160 #250
         offwind:
           DE:
             2020: 7.8
             2025: 11.3
-            2030: 29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
             2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
-            2040: 65   # Planned projects until 2040 -1.5 GW for potential retirments
-            2045: 70
+            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 75.5 #70
         solar:
           DE:
             2020: 53.7
             2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
-            2030: 235 # PV Ziel 2030 + 20 GW
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
             2035: 400
-            2040: 800
-            2045: 1000
+            2040: 366 #800
+            2045: 400 #1000
       Store:
         co2 sequestered:
           DE:
@@ -672,25 +1056,28 @@ solving:
       Generator:
         onwind:
           DE:
-            2030: 99    # Wind-an-Land Law 2028
-            2035: 115   # Wind-an-Land Law 2030
-            2040: 157   # target 2035
-            2045: 160   # target 2040
+            2020: 54.5
+            2025: 69
+            2030: 115 # EEG2023 Ziel für 2030
+            2035: 145 # EEG2023 Ziel für 2040
+            2040: 159 #250
+            2045: 160 #250
         offwind:
           DE:
-            2030: 22.5   # 75% Wind-auf-See Law
-            2035: 35
-            2040: 42
-            2045: 50
+            2020: 7.8
+            2025: 11.3
+            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
+            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 75.5 #70
         solar:
           DE:
-            # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
-            # assuming at least 1/3 of difference reached in 2025
-            2025: 101
-            2030: 101
-            2035: 101
-            2040: 101
-            2045: 101
+            2020: 53.7
+            2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
+            2035: 400
+            2040: 366 #800
+            2045: 400 #1000
     # boundary condition of maximum volumes
     limits_volume_max:
       # constrain electricity import in TWh
@@ -699,55 +1086,55 @@ solving:
           2020: -20
           2025: 0
           2030: 0
-          2035: 10 #40
-          2040: 25 #80
-          2045: 50 #125
+          2035: 0  # 10 #40
+          2040: 0  # 25 #80
+          2045: 0  # 50 #125
       electrolysis:
-        # boundary condition lower?
         DE:
           2020: 0
-          2025: 15
-          2030: 75
-          2035: 180
-          2040: 300
-          2045: 400
-      h2_derivate_import:
-        # boundary condition lower?
+          2025: 10     # More ambitious early deployment
+          2030: 60     # More ambitious early deployment
+          2035: 160    # Matches NEP C 2037 (160 TWh)
+          2040: 240    # Between C 2037 and C 2045
+          2045: 320    # Matches NEP C 2045 (320 TWh)
+      h2_derivate_import: # Fixed indentation - moved out from under electrolysis
         DE:
           2020: 0
-          2025: 10
-          2030: 30
-          2035: 150
-          2040: 250
-          2045: 350
-      h2_import:
-        # boundary condition lower?
+          2025: 5      # More ambitious early deployment
+          2030: 20     # More ambitious early deployment
+          2035: 120    # Original value, fits C scenario
+          2040: 220    # Higher than conservative
+          2045: 340    # Higher than conservative
+      h2_import: # Fixed indentation - moved out from under electrolysis
         DE:
           2020: 0
-          2025: 15
-          2030: 45
-          2035: 180
-          2040: 300
-          2045: 425
-    limits_volume_min:
+          2025: 10     # More ambitious early deployment
+          2030: 25     # More ambitious early deployment
+          2035: 130    # Higher than conservative
+          2040: 240    # Higher than conservative
+          2045: 360    # Higher than conservative
+
+    limits_volume_min: # Fixed indentation - moved out to top level
       electrolysis:
         DE:
           2020: 0
           2025: 0
-          2030: 0
-          2035: 0
-          2040: 0
-          2045: 0
-    limits_power_max: # in GW
+          2030: 10   # Minimum deployment requirements
+          2035: 80   # Minimum deployment requirements
+          2040: 160  # Minimum deployment requirements
+          2045: 240  # Minimum deployment requirements
+
+    limits_power_max: # Fixed indentation - moved out to top level
       DE:
         2020: 15
-        2025: 20
-        2030: 30
-        2035: 40
-        2040: 50
-        2045: 60
+        2025: 20     # More ambitious early deployment
+        2030: 90     # Higher than original
+        2035: 120    # Based on 160 TWh at ~1750 full load hours (assumes ~90% capacity factor, higher efficiency)
+        2040: 180    # Between 2035 and 2045 values
+        2045: 240    # Based on 320 TWh at ~1750 full load hours (higher than original value)
 
-  # solver:
+  #solver:
+    #name: gurobi
   #   options: gurobi-numeric-focus
   # solver_options:
   #   gurobi-default:
@@ -795,8 +1182,8 @@ electricity:
     force: 2035
     cost_factor: 0.15 # repurposing cost of OCGT gas to H2 in % investment cost in EUR/MW source: Christidis et al (2023) - H2-Ready-Gaskraftwerke, Table 3 https://reiner-lemoine-institut.de/wp-content/uploads/2023/11/RLI-Studie-H2-ready_DE.pdf
     efficiency_loss: 0.05
-    extendable_carriers:
-    Generator: [ OCGT, CCGT ]
+    #extendable_carriers:
+    #Generator: [ OCGT, CCGT ]
     #StorageUnit: [ ] # battery, H2
     #Store: [battery, H2]
     #Link: [ ] # H2 pipeline

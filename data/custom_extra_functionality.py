@@ -14,7 +14,7 @@ def add_power_limits(n):
     """
     ct = 'DE'
 
-    limit = 0 * 1e3 / 10
+    limit = 0
     # limit = 1e3 * limits_power_max[ct][investment_year] / 10
 
     logger.info(
