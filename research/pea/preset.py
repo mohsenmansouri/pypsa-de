@@ -2,6 +2,7 @@ c_e_battery = ['battery', 'home battery']
 c_e_bev = ['EV battery']
 c_e_DSM = ['DSM']
 c_e_PHS = ['PHS']
+c_e_H2 = ['H2 Store']
 
 c_power = ['AC', 'DC']
 c_battery = ['battery', 'home battery']
@@ -74,6 +75,7 @@ map_name = {
   'c_e_bev': 'EV battery',
   'c_e_DSM': 'DSM',
   'c_e_PHS': 'PHS',
+  'c_e_H2': 'H2'
 
 }
 
@@ -109,6 +111,7 @@ map_color = {
   'c_e_bev': '#B9703C',
   'c_e_DSM': '#C888B2',
   'c_e_PHS': '#5F92C3',
+  'c_e_H2': '#C78D63'
 }
 
 map_name_color = {map_name[key]: value for key, value in map_color.items() if key in map_name}
