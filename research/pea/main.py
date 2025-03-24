@@ -96,7 +96,7 @@ class Grouper:
           energy = self.t(p).sum(axis=1).sum() * self.config["resolution"]
           return abs(energy)
         except:
-          return 0
+          return 0       
     
     def p(self, p="p"):
         try:
