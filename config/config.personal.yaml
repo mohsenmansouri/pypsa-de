@@ -14,3 +14,168 @@ private:
 remote:
   ssh: ""
   path: ""
+
+iiasa_database:
+    reference_scenario: 8Gt_Bal_v3
+    fallback_reference_scenario: 8Gt_Bal_v3
+co2_budget_DE_source: KSG
+
+costs:
+  horizon: mean
+  NEP: 2023
+  transmission: overhead   # either overhead line ("overhead") or underground cable ("underground")
+
+solving:
+  test: personal
+  efuel_export_ban: false
+  constraints:
+    limits_volume_max:
+        # constrain electricity import in TWh
+        electricity_import:
+          DE:
+            2020: -20
+            2025: 0
+            2030: 0
+            2035: 40
+            2040: 80
+            2045: 125
+        electrolysis:
+          DE:
+            2020: 0
+            2025: 5
+            2030: 45
+            2035: 130
+            2040: 215
+            2045: 300
+        h2_derivate_import:
+          DE:
+            2020: 0
+            2025: 0
+            2030: 10
+            2035: 105
+            2040: 200
+            2045: 300
+        h2_import:
+          DE:
+            2020: 0
+            2025: 5
+            2030: 15
+            2035: 115
+            2040: 220
+            2045: 325
+    limits_volume_min:
+      electrolysis:
+        DE:
+          2020: 0
+          2025: 0
+          2030: 0
+          2035: 0
+          2040: 0
+          2045: 0        
+
+    co2_budget_national:
+      2020:
+        DE: 0.668
+      2025:
+        DE: 0.521
+      2030:
+        DE: 0.351
+      2035:
+        DE: 0.217
+      2040:
+        DE: 0.09
+      2045:
+        DE: -0.05
+      2050:
+        DE: -0.046
+    limits_capacity_max:
+      Generator:
+        onwind:
+          DE:
+            2020: 54.5
+            2025: 69
+            2030: 115 # EEG2023 Ziel für 2030
+            2035: 145 # EEG2023 Ziel für 2040
+            2040: 159 #250
+            2045: 160 #250
+        offwind:
+          DE:
+            2020: 7.8
+            2025: 11.3
+            2030: 30 #29.3 # uba Projektionsbericht and NEP without delayed BalWin 3
+            2035: 50 # Planned projects until 2035 (offshore_connection_points.csv) -1.3 GW for potential delays
+            2040: 66 #65   # Planned projects until 2040 -1.5 GW for potential retirments
+            2045: 75.5 #70
+        solar:
+          DE:
+            2020: 53.7
+            2025: 110 # EEG2023; assumes for 2026: 128 GW, assuming a fair share reached by end of 2025
+            2030: 215 #235 # PV Ziel 2030 + 20 GW
+            2035: 400
+            2040: 366 #800
+            2045: 400 #1  
+      Link:
+        methanolisation:
+          DE:
+            2030: 5.7
+            2035: 5.7
+            2040: 5.7
+            2045: 5.7
+            2050: 5.7
+        Fischer-Tropsch:
+          DE:
+            2030: 2.5
+            2035: 2.5
+            2040: 2.5
+            2045: 2.5
+            2050: 2.5
+        HVC to air:
+          DE:
+            2020: 0 # all HVC in Germany is either burned or recycled
+            2025: 0
+            2030: 0
+            2035: 0
+            2040: 0
+            2045: 0
+            2050: 0
+    limits_capacity_min:
+      Generator:
+        onwind:
+          DE:
+            2030: 115    # Wind-an-Land Law 2028
+            2035: 145   # Wind-an-Land Law 2030
+            2040: 159   # target 2035
+            2045: 160   # target 2040
+        offwind:
+          DE:
+            2030: 30   # 75% Wind-auf-See Law
+            2035: 50
+            2040: 66
+            2045: 75.5
+        solar:
+          DE:
+            # EEG2023; Ziel for 2024: 88 GW and for 2026: 128 GW,
+            # assuming at least 1/3 of difference reached in 2025
+            2025: 110
+            2030: 215
+            2035: 400
+            2040: 366
+            2045: 400
+      Link:
+        H2 Electrolysis:
+          DE:
+            2030: 5
+  industry:
+    steam_biomass_fraction: 0.4
+    steam_hydrogen_fraction: 0.3
+    steam_electricity_fraction: 0.3
+
+  sector:
+    aviation_demand_factor:
+      2020: 1.0
+      2025: 0.9321
+      2030: 0.8687
+      2035: 0.7719
+      2040: 0.6926
+      2045: 0.6417
+      2050: 0.7196

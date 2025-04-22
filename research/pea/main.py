@@ -155,8 +155,6 @@ class Pea:
             if type == "import":
                 zone = ((~df["bus0"].str.startswith(self.zone)) & df[
                     "bus1"
-                ].str.startswith(self.zone)) | (df["bus0"].str.startswith(self.zone) & ~df[
-                    "bus1"
                 ].str.startswith(self.zone))
 
             if type == "inner":
@@ -166,8 +164,6 @@ class Pea:
 
             if type == "export":
                 zone = (df["bus0"].str.startswith(self.zone) & ~df[
-                    "bus1"
-                ].str.startswith(self.zone)) |((~df["bus0"].str.startswith(self.zone)) & df[
                     "bus1"
                 ].str.startswith(self.zone))
             dfIndexs = zone & df["carrier"].isin(carriers)

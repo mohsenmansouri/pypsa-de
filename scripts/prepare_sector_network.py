@@ -2985,10 +2985,12 @@ def add_heat(
                 e_nom_extendable=True,
                 carrier=f"{heat_system} water tanks",
                 standing_loss=1 - np.exp(-1 / 24 / tes_time_constant_days),
-                capital_cost=costs.at[
-                    heat_system.central_or_decentral + " water tank storage",
-                    "capital_cost",
-                ],
+                capital_cost= 446,
+                # TODO@yechenyan
+                # capital_cost=costs.at[
+                #     heat_system.central_or_decentral + " water tank storage",
+                #     "capital_cost",
+                # ],
                 overnight_cost=costs.at[
                     heat_system.central_or_decentral + " water tank storage",
                     "investment",
@@ -4752,7 +4754,7 @@ def add_industry(
         suffix=" industry electricity",
         bus=nodes,
         carrier="industry electricity",
-        p_set=industrial_demand.loc[nodes, "electricity"] / nhours,
+        p_set=industrial_demand.loc[nodes, "electricity"] / nhours * 0.828,
     )
 
     n.add(
