@@ -4,7 +4,7 @@
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  quick_test: true
+  # quick_test: true
   prefix: 20250414-NEP-flex
   name: 8Gt_Bal_v3
   # - 8Gt_Bal_v3
@@ -57,9 +57,9 @@ scenario:
   planning_horizons:
   #- 2020
   #- 2025
-  # - 2030
+  - 2030
   #- 2035
-  # - 2040
+  - 2040
   - 2045
   #- 2050
 
