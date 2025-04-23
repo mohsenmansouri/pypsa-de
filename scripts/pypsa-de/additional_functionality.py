@@ -227,6 +227,48 @@ def h2_import_limits(n, investment_year, limits_volume_max):
             type="",
             carrier_attribute="",
         )
+def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max):
+    
+    if "battery" not in limits_volume_min:
+        return
+    
+    for ct in limits_volume_min.get("battery", {}):
+        stores = n.stores[
+                (n.stores.carrier == "battery") & (n.stores.bus.str.contains(ct))
+            ].index
+        for t in n.snapshots:
+            lhs = n.model["Store-e"].loc[t, stores].sum() / 10
+
+            # if investment_year in limits_volume_min.get("battery", {}).get(ct, {}):
+            #     limit_lower = limits_volume_min["battery"][ct][investment_year] * 1e3 / 10
+            #     cname_lower = f"battery_volume_limit_lower-{ct}-{t}"
+            #     n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+
+            if investment_year in limits_volume_max.get("battery", {}).get(ct, {}):
+                limit_upper = limits_volume_max["battery"][ct][investment_year] * 1e3 / 10
+                cname_upper = f"battery_volume_limit_upper-{ct}-{t}"
+                n.model.add_constraints(lhs <= limit_upper, name=f"GlobalConstraint-{cname_upper}")
+
+def add_home_battery_limits(n, investment_year, limits_volume_min, limits_volume_max):
+    if "home battery" not in limits_volume_min:
+        return
+    for ct in limits_volume_min.get("home battery", {}):
+        stores = n.stores[
+                (n.stores.carrier == "home battery") & (n.stores.bus.str.contains(ct))
+            ].index
+
+        for t in n.snapshots:
+            lhs = n.model["Store-e"].loc[t, stores].sum() / 10 
+
+            # if investment_year in limits_volume_min.get("home battery", {}).get(ct, {}):
+            #     limit_lower = limits_volume_min["home battery"][ct][investment_year] * 1e3 / 10
+            #     cname_lower = f"home_battery_volume_limit_lower-{ct}-{t}"
+            #     n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+
+            if investment_year in limits_volume_max.get("home battery", {}).get(ct, {}):
+                limit_upper = limits_volume_max["home battery"][ct][investment_year] * 1e3 / 10
+                cname_upper = f"home_battery_volume_limit_upper-{ct}-{t}"
+                n.model.add_constraints(lhs <= limit_upper, name=f"GlobalConstraint-{cname_upper}")
 
 
 def h2_production_limits(n, investment_year, limits_volume_min, limits_volume_max):
@@ -750,7 +792,8 @@ def additional_functionality(n, snapshots, snakemake):
         )
 
     add_h2_derivate_limit(n, investment_year, constraints["limits_volume_max"])
-
+    add_battery_limits(n, investment_year, constraints["limits_volume_min"],constraints["limits_volume_max"])
+    add_home_battery_limits(n, investment_year, constraints["limits_volume_min"],constraints["limits_volume_max"])
     # force_boiler_profiles_existing_per_load(n)
     force_boiler_profiles_existing_per_boiler(n)
 

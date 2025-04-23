@@ -1139,12 +1139,15 @@ def phase_out_conventional_generators(n, config=None):
             "patterns": ["H2 retrofit", "hydrogen retrofit"]
         },
         "urban_central_solid_biomass_CHP": {
-            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP"],
+            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
             "exclude": ["CC", "cc"]
         },
         "urban_central_solid_biomass_CHP_CC": {
-            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP"],
+            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
             "require": ["CC", "cc"]
+        },
+        "other_biomass": {
+            "patterns":["urban decentral biomass boiler",  "rural biomass boiler"] 
         }
     }
 
