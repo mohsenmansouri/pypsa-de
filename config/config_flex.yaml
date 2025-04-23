@@ -8,7 +8,7 @@ run:
   
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  test: 1
+  test: 2
   tes_tau:
     decentral: 6
     central: 180
@@ -253,6 +253,14 @@ solving:
         H2 Fuel Cell:
           DE:
             2045: 0
+        home battery discharger:
+          DE:
+            2040: 66 # 55
+            2045: 84 # 70
+        battery discharger:
+          DE:
+            2040: 38.4 #32
+            2045: 43.2 # 36
         # urban central resistive heat_pump_peak_hours:
         #   DE:
         #     2045: 0
@@ -278,12 +286,12 @@ solving:
             2045: 12.9
         home battery discharger:
           DE:
-            2040: 66 # 55
-            2045: 84 # 70
+            2040: 55 
+            2045: 70 
         battery discharger:
           DE:
-            2040: 38.4 #32
-            2045: 43.2 # 36
+            2040: 32 #32
+            2045: 36 # 36
     limits_volume_max:
       # constrain electricity import in TWh
       electricity_import:
@@ -293,8 +301,8 @@ solving:
           2030: 0
           2035: 40
           2040: 80
-          2045: 50
-          2050: 50
+          2045: 120
+          2050: 120
       electrolysis:
       # boundary condition lower?
         DE:
@@ -325,41 +333,41 @@ solving:
           2040: 35
           2045: 45
           2050: 50
-      battery: #GWh
+      battery: #GWh 149， 175
         DE:
           2020: 0
           2025: 0
-          2030: 0
-          2035: 172
-          2040: 172
-          2045: 172
-          2050: 172
-      home battery: #GWh
+          2030: 100
+          2035: 190
+          2040: 223
+          2045: 262
+          2050: 262
+      home battery: #GWh 72， 143
         DE:
           2020: 0
           2025: 0
-          2030: 0
-          2035: 210
-          2040: 210
-          2045: 210
-          2050: 210
+          2030: 60
+          2035: 80
+          2040: 108
+          2045: 214
+          2050: 214
     limits_volume_min:
-      battery: #GWh
+      battery: #GWh 
         DE:
           2020: 0
           2025: 0
-          2030: 0
-          2035: 143
-          2040: 143
+          2030: 20
+          2035: 50
+          2040: 72
           2045: 143
           2050: 143
-      home battery: #GWh
+      home battery: #GWh 
         DE:
           2020: 0
           2025: 0
-          2030: 0
-          2035: 175
-          2040: 175
+          2030: 60
+          2035: 100
+          2040: 149
           2045: 175
           2050: 175
       electrolysis:
@@ -378,5 +386,5 @@ solving:
         2030: 20
         2035: 25
         2040: 30
-        2045: 35
-        2050: 35
+        2045: 42
+        2050: 42

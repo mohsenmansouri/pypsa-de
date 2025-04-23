@@ -2977,6 +2977,15 @@ def add_heat(
                 heat_system.central_or_decentral
             ]
 
+            # TODO@chenyan
+            tes_capital_cost = costs.at[
+                heat_system.central_or_decentral + " water tank storage", "capital_cost"]
+
+            if heat_system.central_or_decentral == "decentral":
+                tes_capital_cost = 2942
+
+            
+
             n.add(
                 "Store",
                 nodes + f" {heat_system} water tanks",
@@ -2985,8 +2994,8 @@ def add_heat(
                 e_nom_extendable=True,
                 carrier=f"{heat_system} water tanks",
                 standing_loss=1 - np.exp(-1 / 24 / tes_time_constant_days),
-                capital_cost= 446,
-                # TODO@yechenyan
+                capital_cost= tes_capital_cost,
+                # TODO@chenyan
                 # capital_cost=costs.at[
                 #     heat_system.central_or_decentral + " water tank storage",
                 #     "capital_cost",
@@ -2999,6 +3008,7 @@ def add_heat(
                     heat_system.central_or_decentral + " water tank storage", "lifetime"
                 ],
             )
+
 
         if options["resistive_heaters"]:
             key = f"{heat_system.central_or_decentral} resistive heater"

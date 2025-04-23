@@ -239,10 +239,10 @@ def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max)
         for t in n.snapshots:
             lhs = n.model["Store-e"].loc[t, stores].sum() / 10
 
-            if investment_year in limits_volume_min.get("battery", {}).get(ct, {}):
-                limit_lower = limits_volume_min["battery"][ct][investment_year] * 1e3 / 10
-                cname_lower = f"battery_volume_limit_lower-{ct}-{t}"
-                n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+            # if investment_year in limits_volume_min.get("battery", {}).get(ct, {}):
+            #     limit_lower = limits_volume_min["battery"][ct][investment_year] * 1e3 / 10
+            #     cname_lower = f"battery_volume_limit_lower-{ct}-{t}"
+            #     n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
 
             if investment_year in limits_volume_max.get("battery", {}).get(ct, {}):
                 limit_upper = limits_volume_max["battery"][ct][investment_year] * 1e3 / 10
@@ -260,10 +260,10 @@ def add_home_battery_limits(n, investment_year, limits_volume_min, limits_volume
         for t in n.snapshots:
             lhs = n.model["Store-e"].loc[t, stores].sum() / 10 
 
-            if investment_year in limits_volume_min.get("home battery", {}).get(ct, {}):
-                limit_lower = limits_volume_min["home battery"][ct][investment_year] * 1e3 / 10
-                cname_lower = f"home_battery_volume_limit_lower-{ct}-{t}"
-                n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+            # if investment_year in limits_volume_min.get("home battery", {}).get(ct, {}):
+            #     limit_lower = limits_volume_min["home battery"][ct][investment_year] * 1e3 / 10
+            #     cname_lower = f"home_battery_volume_limit_lower-{ct}-{t}"
+            #     n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
 
             if investment_year in limits_volume_max.get("home battery", {}).get(ct, {}):
                 limit_upper = limits_volume_max["home battery"][ct][investment_year] * 1e3 / 10
