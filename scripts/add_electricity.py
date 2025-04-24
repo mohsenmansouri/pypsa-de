@@ -793,7 +793,7 @@ def attach_hydro(
             phs.index,
             carrier="PHS",
             bus=phs["bus"],
-            p_nom=phs["p_nom"],
+            p_nom=phs["p_nom"] * 1.556, # TODO@chenyan
             capital_cost=costs.at["PHS", "capital_cost"],
             overnight_cost=costs.at["PHS", "investment"],
             max_hours=phs["max_hours"],
