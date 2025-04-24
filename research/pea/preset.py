@@ -9,7 +9,7 @@ c_power = ['AC', 'DC']
 c_battery = ['battery', 'home battery']
 
 c_pg_natgas = ['urban central gas CHP CC', 'urban central gas CHP', 'CCGT', 'OCGT']
-c_pg_coal_oil = ['urban central lignite CHP', 'urban central oil CHP', 'coal']
+c_pg_coal_oil = ['urban central lignite CHP', 'urban central oil CHP', 'coal', 'oil']
 c_pg_h2 = ['H2 Fuel Cell', 'H2 OCGT', 'urban central H2 CHP']
 c_pg_retrofit_h2 = ['H2 retrofit OCGT', 'urban central H2 retrofit CHP']
 
@@ -55,7 +55,7 @@ map_name = {
   'c_pg_h2': 'hydrogen generation',
   'c_pg_retrofit_h2': 'retrofit H2 generation',
   'c_pg_import': 'import power',
-  'c_pg_inner_import': 'transmission(receive)',
+  'c_pg_inner_import': 'transmission(transmit)',
   'c_pg_battery': 'battery dispatch',
   'c_pg_phs': 'PHS dispatch',
   'c_pg_dsm': 'DSM dispatch',
@@ -78,9 +78,9 @@ map_name = {
   'c_pc_resistive': 'resistive heat',
   'c_pc_battery': 'battery charger',
   'c_pc_phs': 'PHS charger',
-  'c_pc_dsm': 'DSM charger',
+  'c_pc_dsm': 'DSM charge',
   'c_pc_export': 'export power',
-  'c_pc_inner_export': 'transmission(transmit)',
+  'c_pc_inner_export': 'transmission(receive)',
 
   'c_e_battery': 'battery',
   'c_e_bev': 'EV battery',

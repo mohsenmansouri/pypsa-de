@@ -8,7 +8,7 @@ run:
   
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  test: 3
+  solar_thermal: true
   tes_tau:
     decentral: 6
     central: 180
@@ -257,9 +257,16 @@ solving:
             2045: 116.0
         H2 OCGT:
           DE:
+            2025: 0
+            2030: 51
+            2035: 51
+            2040: 51
             2045: 51
         H2 Fuel Cell:
           DE:
+            2025: 0
+            2035: 0
+            2040: 0
             2045: 0
         home battery discharger:
           DE:
@@ -365,16 +372,16 @@ solving:
           2020: 0
           2025: 0
           2030: 20
-          2035: 50
-          2040: 72
-          2045: 143
-          2050: 143
+          2035: 120
+          2040: 149
+          2045: 175
+          2050: 175
       home battery: #GWh 
         DE:
           2020: 0
           2025: 0
-          2030: 60
-          2035: 100
+          2030: 40
+          2035: 60
           2040: 149
           2045: 175
           2050: 175
