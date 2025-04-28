@@ -963,7 +963,6 @@ def add_heating_capacities_installed_before_baseyear(
             efficiency = get_efficiency(
                 heat_system, "gas", nodes, heating_efficiencies, costs
             )
-
             n.add(
                 "Link",
                 nodes,
@@ -1019,6 +1018,7 @@ def add_heating_capacities_installed_before_baseyear(
                     f"{heat_system.central_or_decentral} gas boiler", "lifetime"
                 ],
             )
+            # TODO@chenayn biomas
             # add biomass boilers
             n.add(
                 "Link",

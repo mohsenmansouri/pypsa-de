@@ -1084,12 +1084,22 @@ def phase_out_conventional_generators(n, config=None):
                         break
                 except (ValueError, IndexError):
                     continue
-
     if not planning_year:
         # Try to get year from config
         planning_year = config.get("year", 2045)
         logging.info(f"Using planning year {planning_year} from config")
 
+    if planning_year == 2045:
+        for link in ['DE0 7 CCGT-1965', 'DE0 2 CCGT-1980', 'DE0 0 CCGT-1995',
+       'DE0 1 CCGT-1995', 'DE0 3 CCGT-1995', 'DE0 0 CCGT-2010',
+       'DE0 1 CCGT-2010', 'DE0 1 CCGT-2015', 'DE0 4 CCGT-2015',
+       'DE0 7 CCGT-2015', 'DE0 1 OCGT-2015', 'DE0 2 CCGT-2020',
+       'DE0 4 CCGT-2020']:
+            try:
+                n.remove('Link', link)
+            except KeyError:
+                logging.warning(f"Link {link} not found in network, skipping removal")
+        
     # Get phase-out settings from config
     phaseout_settings = config.get("solving", {}).get("constraints", {}).get("generator_phaseout", {})
 
@@ -1148,6 +1158,10 @@ def phase_out_conventional_generators(n, config=None):
         },
         "other_biomass": {
             "patterns":["urban decentral biomass boiler",  "rural biomass boiler"] 
+        },
+        "urban_central_gas_boiler": {
+            "patterns": ["urban central gas boiler"],
+            "require": ['boiler']
         }
     }
 
@@ -1230,9 +1244,14 @@ def phase_out_conventional_generators(n, config=None):
         # Apply phase-out by setting capacity to zero or reduced capacity
         for comp_idx in component_indices:
             original_p_nom = n.links.at[comp_idx, 'p_nom']
-
             # Calculate new capacity based on limit
             new_p_nom = original_p_nom * current_limit
+
+            # if "urban central gas boiler" in comp_idx:
+            #     n.remove("Link", comp_idx)
+            #     logging.info(f"Removed {comp_idx} due to complete phase-out")
+            # else:
+                
             n.links.at[comp_idx, 'p_nom'] = new_p_nom
 
             # Also adjust p_nom_max if it exists

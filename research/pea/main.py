@@ -89,9 +89,17 @@ class Grouper:
     def total_cost(self, p="p"):
         return self.capital_cost() + self.opex_cost(p)
         
-    def p_nom_opt(self):
+    def p_nom_opt(self, p= None):
         try:
-          return self.df["p_nom_opt"].sum()
+          if p is None:
+            return self.df["p_nom_opt"].sum()
+          
+          pMax = self.t(p).max().sum()
+          if pMax > 0:
+            return pMax
+          
+          pMin = self.t(p).min().sum()
+          return - pMin
         except:
           return 0
 

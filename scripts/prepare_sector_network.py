@@ -1626,6 +1626,8 @@ def insert_electricity_distribution_grid(n, costs):
 
 
 def add_low_voltage_dsm (n, config, planning_horizons, sector_opts):
+    if config == None:
+        return
     year_config = config.get(planning_horizons, None)
     opts = re.findall(r'\d+', sector_opts)
     resample =  int(opts[0])
@@ -2982,7 +2984,7 @@ def add_heat(
                 heat_system.central_or_decentral + " water tank storage", "capital_cost"]
 
             if heat_system.central_or_decentral == "decentral":
-                tes_capital_cost = 2942
+                tes_capital_cost = 5884
 
             
 
@@ -3051,7 +3053,6 @@ def add_heat(
                 * overdim_factor,
                 lifetime=costs.at[key, "lifetime"],
             )
-
         if options["solar_thermal"]:
             n.add("Carrier", f"{heat_system} solar thermal")
 
