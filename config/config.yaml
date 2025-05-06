@@ -24,6 +24,10 @@ run:
     - build_industry_sector_ratios   # This is necessary to save build_industry_sector_ratios_data.log in the correct folder
     - modify_existing_heating
   disable_progressbar: true
+  debug_co2_limit: false
+  debug_h2deriv_limit: false
+  debug_unravel_oilbus: false
+  debug_unravel_gasbus: false
 
 iiasa_database:
   db_name: ariadne
@@ -57,9 +61,9 @@ scenario:
   planning_horizons:
   #- 2020
   #- 2025
-  # - 2030
+  - 2030
   #- 2035
-  # - 2040
+  - 2040
   - 2045
   #- 2050
 
@@ -268,37 +272,6 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  bev_dsm_restriction_value: 0.75
-  bev_dsm_restriction_time: 7
-  transport_heating_deadband_upper: 20.
-  transport_heating_deadband_lower: 15.
-  ICE_lower_degree_factor: 0.375
-  ICE_upper_degree_factor: 1.6
-  EV_lower_degree_factor: 0.98
-  EV_upper_degree_factor: 0.63
-  bev_dsm: 2030
-  bev_dsm_availability: 0.5
-  bev_energy: 0.05
-  bev_charge_efficiency: 0.9
-  bev_charge_rate: 0.011
-  bev_avail_max: 0.95
-  bev_avail_mean: 0.8
-  heat_pump_flexibility: true  # Set to false to disable flexibility
-  heat_pump_avail_max: 1.0      # Set to 1.0 for full capacity
-  heat_pump_avail_min: 0.3      # Only used when flexibility is enabled
-  heat_pump_peak_hours: [ 7, 8, 17, 18, 19 ]
-  co2_sequestration_potential:
-    2020: 0
-    2025: 0
-    2030: 20 #20 #17 #25 #50
-    2035: 30 #30 #35 #50 #100
-    2040: 60 #60 #75 #100 #200
-    2045: 60 #60 #75 #100 #200
-    2050: 60 #60 #75 #100 #200
-
-
-  chp:
-    enable: false # This should only deactivate the CHPs from prepare_sector_network, not those from add_existing_baseyear
   v2g: false
   solar_thermal: false
   district_heating:
@@ -311,10 +284,6 @@ sector:
       2040: 0.6
       2045: 0.8
       2050: 1.0
-  heat_vent:
-    urban central: true
-    urban decentral: true
-    rural: true
   co2_spatial: true
   biomass_spatial: true
   #TBD what to include in config
@@ -423,11 +392,6 @@ industry:
     2040: 0.6
     2045: 0.6
     2050: 0.6
-  waste_to_energy: false
-  waste_to_energy_cc: false
-  steam_biomass_fraction: 0.4
-  steam_hydrogen_fraction: 0.3
-  steam_electricity_fraction: 0.3
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#solving
 solving:
@@ -457,176 +421,16 @@ solving:
         H2 pipeline retrofitted: 0.05
       fractional_last_unit_size: true
   constraints:
-    generator_phaseout:
-      apply_constraints: true
-
-      # CCGT phase-out
-      CCGT:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.4
-          2045: 0.0
-
-      # OCGT phase-out
-      OCGT:
-        phase_out_year: 2050
-        capacity_limits:
-          2030: 0.6
-          2035: 0.3
-          2040: 0.2
-          2045: 0.1
-          2050: 0.0
-
-      # Urban gas CHP phase-out
-      urban_central_gas_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.8
-          2035: 0.5
-          2040: 0.2
-          2045: 0.0
-
-      # CC CHP gas phase-out (can be different from non-CC)
-      urban_central_gas_CHP_CC:
-        phase_out_year: 2050
-        capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 0.5
-          2050: 0
-
-      # Urban oil CHP phase-out
-      urban_central_oil_CHP:
-        phase_out_year: 2035
-        capacity_limits:
-          2025: 0.5
-          2030: 0.2
-          2035: 0.0
-
-      # Waste CHP phase-out
-      waste_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.7
-          2035: 0.3
-          2040: 0.2
-          2045: 0.0
-
-      # Waste CHP CC phase-out
-      waste_CHP_CC:
-        phase_out_year: 2050
-        capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 1
-          2050: 0
-      # Biomass CHP phase-out - conventional
-      urban_central_solid_biomass_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.2
-          2045: 0.0
-
-      # Biomass CHP CC phase-out
-      urban_central_solid_biomass_CHP_CC:
-        phase_out_year: 2045  # Later phase-out for CC versions
-        capacity_limits:
-          2035: 1
-          2040: 1
+    limits_volume_min:
+      electrolysis:
+        DE:
+          2020: 0
+          2025: 0
+          2030: 0
+          2035: 0
+          2040: 0
           2045: 0
-          2050: 0
-
-      # No phase-out for H2 technologies (empty config means no constraints)
-      urban_central_H2_CHP: { }
-      H2_OCGT: { }
-      H2_retrofit_OCGT: { }
-
-    heat_pumps:
-      apply_constraints: true
-      active_scenario: "conservative"
-      countries: [ "DE" ]
-
-      scenarios:
-        conservative: # Following NEP scenario B
-          # Previous years unchanged
-          2020:
-            rural air heat pump: { min: 0, max: 1000 }
-            rural ground heat pump: { min: 0, max: 1000 }
-            urban central air heat pump: { min: 0, max: 1500 }
-            urban decentral air heat pump: { min: 0, max: 1500 }
-          2025:
-            rural air heat pump: { min: 400, max: 2500 }
-            rural ground heat pump: { min: 200, max: 2000 }
-            urban central air heat pump: { min: 800, max: 4000 }
-            urban decentral air heat pump: { min: 800, max: 4000 }
-          2030:
-            rural air heat pump: { min: 800, max: 5000 }
-            rural ground heat pump: { min: 500, max: 4000 }
-            urban central air heat pump: { min: 1500, max: 8000 }
-            urban decentral air heat pump: { min: 1500, max: 8000 }
-          2035:
-            rural air heat pump: { min: 1500, max: 7000 }
-            rural ground heat pump: { min: 800, max: 6000 }
-            urban central air heat pump: { min: 2500, max: 10000 }
-            urban decentral air heat pump: { min: 2500, max: 10000 }
-          # Updated based on NEP B 2037
-          2040:
-            # Total household heat pumps: 63.9 TWh / 2000h = ~32 GW
-            # Distributed across 4 types (with more weight to urban)
-            rural air heat pump: { min: 5500, max: 5500 }
-            rural ground heat pump: { min: 4500, max: 4500 }
-            urban central air heat pump: { min: 11000, max: 11000 }
-            urban decentral air heat pump: { min: 11000, max: 11000 }
-          # Updated based on NEP B 2045
-          2045:
-            # Total household heat pumps: 76.6 TWh / 2000h = ~38.3 GW
-            rural air heat pump: { min: 6500, max: 6500 }
-            rural ground heat pump: { min: 5500, max: 5500 }
-            urban central air heat pump: { min: 13150, max: 13150 }
-            urban decentral air heat pump: { min: 13150, max: 13150 }
-
-        optimistic: # More ambitious than NEP scenario B
-          # Previous years unchanged
-          2020:
-            rural air heat pump: { min: 0, max: 1000 }
-            rural ground heat pump: { min: 0, max: 1000 }
-            urban central air heat pump: { min: 0, max: 1500 }
-            urban decentral air heat pump: { min: 0, max: 1500 }
-          2025:
-            rural air heat pump: { min: 400, max: 2500 }
-            rural ground heat pump: { min: 200, max: 2000 }
-            urban central air heat pump: { min: 800, max: 4000 }
-            urban decentral air heat pump: { min: 800, max: 4000 }
-          2030:
-            rural air heat pump: { min: 800, max: 5000 }
-            rural ground heat pump: { min: 500, max: 4000 }
-            urban central air heat pump: { min: 1500, max: 8000 }
-            urban decentral air heat pump: { min: 1500, max: 8000 }
-          2035:
-            rural air heat pump: { min: 1500, max: 7000 }
-            rural ground heat pump: { min: 800, max: 6000 }
-            urban central air heat pump: { min: 2500, max: 10000 }
-            urban decentral air heat pump: { min: 2500, max: 10000 }
-          # Updated based on NEP B 2037
-          2040:
-            # Total household heat pumps: 63.9 TWh / 2000h = ~32 GW
-            # Distributed across 4 types (with more weight to urban)
-            rural air heat pump: { min: 5500, max: 5500 }
-            rural ground heat pump: { min: 4500, max: 4500 }
-            urban central air heat pump: { min: 11000, max: 11000 }
-            urban decentral air heat pump: { min: 11000, max: 11000 }
-          # Updated based on NEP B 2045
-          2045:
-            # Total household heat pumps: 76.6 TWh / 2000h = ~38.3 GW
-            rural air heat pump: { min: 6500, max: 6500 }
-            rural ground heat pump: { min: 5500, max: 5500 }
-            urban central air heat pump: { min: 13150, max: 13150 }
-            urban decentral air heat pump: { min: 13150, max: 13150 }
-    efuel_export_ban: false
+    
 
 plotting:
   tech_colors:

@@ -229,10 +229,10 @@ def h2_import_limits(n, investment_year, limits_volume_max):
         )
 def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max):
     
-    if "battery" not in limits_volume_min:
+    if "battery" not in limits_volume_max:
         return
     
-    for ct in limits_volume_min.get("battery", {}):
+    for ct in limits_volume_max.get("battery", {}):
         stores = n.stores[
                 (n.stores.carrier == "battery") & (n.stores.bus.str.contains(ct))
             ].index
@@ -250,9 +250,9 @@ def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max)
                 n.model.add_constraints(lhs <= limit_upper, name=f"GlobalConstraint-{cname_upper}")
 
 def add_home_battery_limits(n, investment_year, limits_volume_min, limits_volume_max):
-    if "home battery" not in limits_volume_min:
+    if "home battery" not in limits_volume_max:
         return
-    for ct in limits_volume_min.get("home battery", {}):
+    for ct in limits_volume_max.get("home battery", {}):
         stores = n.stores[
                 (n.stores.carrier == "home battery") & (n.stores.bus.str.contains(ct))
             ].index

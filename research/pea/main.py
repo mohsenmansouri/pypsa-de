@@ -9,13 +9,18 @@ class Grouper:
 
     def exportP(self, p0="p0", p1="p1"):
         advance = self.t(p0).clip(lower=0)
-        revert = self.t(p1).clip(lower=0)
-        return pd.concat([advance, revert], axis=1)
+        return advance
 
     def importP(self, p0="p0", p1="p1"):
         advance = -self.t(p0).clip(upper=0)
         revert = -self.t(p1).clip(upper=0)
         return pd.concat([advance, revert], axis=1)
+    
+    def advanceP(self, p0="p0"):
+       return self.t(p0).clip(lower=0)
+    
+    def revertP(self, p0="p0"):
+        return - self.t(p0).clip(upper=0)
     
     def innerExportP(self, p0="p0", p1="p1"):
        p0_p = self.t(p0).clip(lower=0)
@@ -133,7 +138,7 @@ class Pea:
         self.config = config
         self.zone = config.get("zone", "DE0 ")
         self.resolution = config.get("resolution", 1)
-
+       
     def get(self, carriers, type="common", components=None, filter=None):
         componentMethods = components
         if components == None and type == "common":
@@ -176,10 +181,10 @@ class Pea:
                 ].str.startswith(self.zone))
             dfIndexs = zone & df["carrier"].isin(carriers)
 
-            if type == "inner":
-                zone = df["bus0"].str.startswith(self.zone) & df["bus1"].str.startswith(
-                    self.zone
-                )
+            if type == "out":
+                condition1 = (~df["bus0"].str.startswith(self.zone)) & df["bus1"].str.startswith(self.zone)
+                condition2 = df["bus0"].str.startswith(self.zone) & ~df["bus1"].str.startswith(self.zone)
+                zone = condition1 | condition2
             dfIndexs = zone & df["carrier"].isin(carriers)
 
             if callable(filter):
@@ -201,3 +206,6 @@ class Pea:
                     resultDf = pd.concat([resultDf, currentDf], axis=0)
         group = Grouper(self.n, resultDf, self.config)
         return group
+
+
+def peaExportP (pea, carrier)

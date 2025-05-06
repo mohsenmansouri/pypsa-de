@@ -2996,12 +2996,12 @@ def add_heat(
                 e_nom_extendable=True,
                 carrier=f"{heat_system} water tanks",
                 standing_loss=1 - np.exp(-1 / 24 / tes_time_constant_days),
-                capital_cost= tes_capital_cost,
+                # capital_cost= tes_capital_cost,
                 # TODO@chenyan
-                # capital_cost=costs.at[
-                #     heat_system.central_or_decentral + " water tank storage",
-                #     "capital_cost",
-                # ],
+                capital_cost=costs.at[
+                    heat_system.central_or_decentral + " water tank storage",
+                    "capital_cost",
+                ],
                 overnight_cost=costs.at[
                     heat_system.central_or_decentral + " water tank storage",
                     "investment",
@@ -4147,15 +4147,15 @@ def add_industry(
         p_set=p_set,
     )
 
-    n.add(
-        "Link",
-        spatial.biomass.industry,
-        bus0=spatial.biomass.nodes,
-        bus1=spatial.biomass.industry,
-        carrier="solid biomass for industry",
-        p_nom_extendable=True,
-        efficiency=1.0,
-    )
+    # n.add(
+    #     "Link",
+    #     spatial.biomass.industry,
+    #     bus0=spatial.biomass.nodes,
+    #     bus1=spatial.biomass.industry,
+    #     carrier="solid biomass for industry",
+    #     p_nom_extendable=True,
+    #     efficiency=1.0,
+    # )
 
     if len(spatial.biomass.industry_cc) <= 1 and len(spatial.co2.nodes) > 1:
         link_names = nodes + " " + spatial.biomass.industry_cc

@@ -12,6 +12,7 @@ c_pg_natgas = ['urban central gas CHP CC', 'urban central gas CHP', 'CCGT', 'OCG
 c_pg_coal_oil = ['urban central lignite CHP', 'urban central oil CHP', 'coal', 'oil']
 c_pg_h2 = ['H2 Fuel Cell', 'H2 OCGT', 'urban central H2 CHP']
 c_pg_retrofit_h2 = ['H2 retrofit OCGT', 'urban central H2 retrofit CHP']
+c_pg_load = ['load']
 
 c_pg_import = c_power
 c_pg_inner_import = c_power
@@ -59,6 +60,7 @@ map_name = {
   'c_pg_battery': 'battery dispatch',
   'c_pg_phs': 'PHS dispatch',
   'c_pg_dsm': 'DSM dispatch',
+  'c_pg_load': 'DSM shedding',
   'c_pg_biomass': 'biomass generation',
   'c_pg_waste': 'waste generation',
   'c_pg_water': 'water',
@@ -101,6 +103,7 @@ map_color = {
   'c_pg_battery': '#3777B4',
   'c_pg_phs': '#5F92C3',
   'c_pg_dsm': '#87AED2',
+  'c_pg_load': '#AFC9E1',
   'c_pg_biomass': '#48A299',
   'c_pg_biogas': '#B6DAD6',
   'c_pg_waste': '#6DB4AD',

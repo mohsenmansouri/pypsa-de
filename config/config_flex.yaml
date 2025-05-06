@@ -8,12 +8,13 @@ run:
   
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  solar_thermal: true
+  test: 2
+  bev_dsm_availability: 0.5
+  heat_pump_flexibility: true
   tes_tau:
-    decentral: 6
+    decentral: 3
     central: 180
-  boilers: false
-  biomass_boiler: false
+
   low_voltage_dsm:
     enable: true
     #scenario: "enhanced_flexibility"  # Add this identifier
@@ -23,251 +24,65 @@ sector:
         s_flex: 0.5
         s_inc: 1
         s_dec: 0
-        delta_t: 4
+        delta_t: 1
       industry electricity:
         s_util: 0.67
         s_flex: 0.5
         s_inc: 0.9
         s_dec: 0.5
-        delta_t: 4
+        delta_t: 2
     "2040":
       electricity:
         s_util: 0.67
         s_flex: 0.5
         s_inc: 1
         s_dec: 0
-        delta_t: 6
+        delta_t: 1
       industry electricity:
         s_util: 0.67
         s_flex: 0.5
         s_inc: 0.9
         s_dec: 0.5
-        delta_t: 6
+        delta_t: 2
     "2045":
       electricity:
         s_util: 0.67
         s_flex: 0.5
         s_inc: 1
         s_dec: 0
-        delta_t: 6
+        delta_t: 1
       industry electricity:
         s_util: 0.67
         s_flex: 0.5
         s_inc: 0.9
         s_dec: 0.5
-        delta_t: 6
+        delta_t: 2
 
-industry:
-  waste_to_energy: false
-  waste_to_energy_cc: false
 solving:
-  test: 5
+  options:
+    load_shedding: 1200
   constraints:
-    generator_phaseout:
-      apply_constraints: true
-
-      # CCGT phase-out
-      CCGT:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.4
-          2045: 0.0
-
-      # OCGT phase-out
-      OCGT:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.6
-          2035: 0.3
-          2040: 0.2
-          2045: 0.0
-          2050: 0.0
-
-      # Urban gas CHP phase-out
-      urban_central_gas_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.8
-          2035: 0.5
-          2040: 0.2
-          2045: 0.0
-
-      # CC CHP gas phase-out (can be different from non-CC)
-      urban_central_gas_CHP_CC:
-        phase_out_year: 2050
-        capacity_limits:
-          2030: 0.8
-          2035: 0.5
-          2040: 0.2
-          2045: 0.0
-
-      # Urban oil CHP phase-out
-      urban_central_oil_CHP:
-        phase_out_year: 2035
-        capacity_limits:
-          2025: 0.5
-          2030: 0.2
-          2035: 0.0
-
-      # Waste CHP phase-out
-      waste_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.7
-          2035: 0.3
-          2040: 0.2
-          2045: 0.0
-
-      # Waste CHP CC phase-out
-      waste_CHP_CC:
-        phase_out_year: 2045
-        capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 0
-          2050: 0
-      # Biomass CHP phase-out - conventional
-      urban_central_solid_biomass_CHP:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.2
-          2045: 0.0
-          2050: 0
-
-      # Biomass CHP CC phase-out
-      urban_central_solid_biomass_CHP_CC:
-        phase_out_year: 2045  # Later phase-out for CC versions
-        capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 0
-          2050: 0
-      other_biomass: 
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.2
-          2045: 0.0
-          2050: 0
-      urban_central_gas_boiler:
-        phase_out_year: 2045
-        capacity_limits:
-          2030: 0.9
-          2035: 0.7
-          2040: 0.2
-          2045: 0.0
-
-      # No phase-out for H2 technologies (empty config means no constraints)
-      urban_central_H2_CHP: { }
-      H2_OCGT: { }
-      H2_retrofit_OCGT: { }
-    resistive_heaters:
-      apply_constraints: true
-      active_scenario: "restrictive"
-      countries: [ "DE" ]
-
-      scenarios:
-        restrictive: # Following NEP scenario B
-          # Previous years unchanged
-          2020:
-            rural resistive heater: { max: 2000 }
-            urban central resistive heater: { max: 3000 }
-            urban decentral resistive heater: { max: 3000 }
-          2025:
-            rural resistive heater: { max: 2000 }
-            urban central resistive heater: { max: 3000 }
-            urban decentral resistive heater: { max: 3000 }
-          2030:
-            rural resistive heater: { max: 2000 }
-            urban central resistive heater: { max: 3000 }
-            urban decentral resistive heater: { max: 3000 }
-          2035:
-            rural resistive heater: { max: 1000 }
-            urban central resistive heater: { max: 1500 }
-            urban decentral resistive heater: { max: 1500 }
-          # Updated based on NEP B 2037 (7.5 GW total)
-          2040:
-            rural resistive heater: { max: 2500 }
-            urban central resistive heater: { max: 2500 }
-            urban decentral resistive heater: { max: 2500 }
-          # Updated based on NEP B 2045 (12.1 GW total)
-          2045:
-            rural resistive heater: { max: 4000 }
-            urban central resistive heater: { max: 4050 }
-            urban decentral resistive heater: { max: 4050 }
-    heat_pumps:
-      apply_constraints: true
-      active_scenario: "conservative"
-      countries: [ "DE" ]
-
-      scenarios:
-        conservative: # Following NEP scenario B
-          # Previous years unchanged
-          2020:
-            rural air heat pump: { min: 0, max: 1000 }
-            rural ground heat pump: { min: 0, max: 1000 }
-            urban central air heat pump: { min: 0, max: 1500 }
-            urban decentral air heat pump: { min: 0, max: 1500 }
-          2025:
-            rural air heat pump: { min: 400, max: 2500 }
-            rural ground heat pump: { min: 200, max: 2000 }
-            urban central air heat pump: { min: 800, max: 4000 }
-            urban decentral air heat pump: { min: 800, max: 4000 }
-          2030:
-            rural air heat pump: { min: 800, max: 5000 }
-            rural ground heat pump: { min: 500, max: 4000 }
-            urban central air heat pump: { min: 1500, max: 8000 }
-            urban decentral air heat pump: { min: 1500, max: 8000 }
-          2035:
-            rural air heat pump: { min: 1500, max: 7000 }
-            rural ground heat pump: { min: 800, max: 6000 }
-            urban central air heat pump: { min: 2500, max: 10000 }
-            urban decentral air heat pump: { min: 2500, max: 10000 }
-          # Updated based on NEP B 2037
-          2040:
-            # Total household heat pumps: 63.9 TWh / 2000h = ~32 GW
-            # Distributed across 4 types (with more weight to urban)
-            rural air heat pump: { min: 5500, max: 5500 }
-            rural ground heat pump: { min: 4500, max: 4500 }
-            urban central air heat pump: { min: 11000, max: 11000 }
-            urban decentral air heat pump: { min: 11000, max: 11000 }
-          # Updated based on NEP B 2045
-          2045:
-            # Total household heat pumps: 76.6 TWh / 2000h = ~38.3 GW
-            rural air heat pump: { min: 6500, max: 6500 }
-            rural ground heat pump: { min: 5500, max: 5500 }
-            urban central air heat pump: { min: 13150, max: 13150 }
-            urban decentral air heat pump: { min: 13150, max: 13150 }
-    efuel_export_ban: false
     limits_capacity_max:
-      Store:
-        co2 sequestered:
+      Generator:
+        load:
           DE:
-            2020: 0
-            2025: 0
-            2030: 10000
-            2035: 20000
-            2040: 50000
-            2045: 80000
-            2050: 80000
+            2030: 1.594
+            2037: 2.063
+            2040: 2.631
+            2045: 3
       Link:
         DSM dispatch:
           DE:
-            2030: 98.0
-            2037: 110.0
-            2040: 114.0
-            2045: 116.0
+            2030: 7.25
+            2037: 14.5
+            2040: 21.75
+            2045: 29
         DSM charge:
-           DE:
-            2030: 98.0
-            2037: 110.0
-            2040: 114.0
-            2045: 116.0
+          DE:
+            2030: 7.25
+            2037: 14.5
+            2040: 21.75
+            2045: 29
         H2 OCGT:
           DE:
             2025: 0
@@ -283,12 +98,16 @@ solving:
             2045: 0
         home battery discharger:
           DE:
-            2040: 66 # 55
-            2045: 84 # 70
+            2039: 20
+            2035: 50
+            2040: 68.907
+            2045: 78.75
         battery discharger:
           DE:
-            2040: 38.4 #32
-            2045: 43.2 # 36
+            2030: 20
+            2035: 30
+            2040: 40.95
+            2045: 46.2
     limits_capacity_min:
       Link:
         DSM dispatch:
@@ -303,107 +122,20 @@ solving:
             2037: 7.0
             2040: 10.0
             2045: 12.9
-        home battery discharger:
-          DE:
-            2040: 55 
-            2045: 70 
-        battery discharger:
-          DE:
-            2040: 32 #32
-            2045: 36 # 36
     limits_volume_max:
-      # constrain electricity import in TWh
-      electricity_import:
-        DE:
-          2020: -20
-          2025: 0
-          2030: 0
-          2035: 40
-          2040: 80
-          2045: 120
-          2050: 120
-      electrolysis:
-      # boundary condition lower?
-        DE:
-          2020: 0
-          2025: 5
-          2030: 45
-          2035: 130
-          2040: 215
-          2045: 300
-          2050: 300
-      h2_derivate_import:
-      # boundary condition lower?
-        DE:
-          2020: 0
-          2025: 0
-          2030: 10
-          2035: 105
-          2040: 200
-          2045: 300
-          2050: 300
-      h2_import:
-      # boundary condition lower?
-        DE:
-          2020: 0
-          2025: 5
-          2030: 15
-          2035: 25
-          2040: 35
-          2045: 45
-          2050: 50
       battery: #GWh 149， 175
         DE:
           2020: 0
           2025: 0
-          2030: 100
-          2035: 190
-          2040: 223
-          2045: 262
-          2050: 262
+          2030: 20
+          2035: 60.21
+          2040: 116.15
+          2045: 183.75
       home battery: #GWh 72， 143
         DE:
           2020: 0
           2025: 0
-          2030: 60
-          2035: 80
-          2040: 108
-          2045: 214
-          2050: 214
-    limits_volume_min:
-      battery: #GWh 
-        DE:
-          2020: 0
-          2025: 0
-          2030: 20
-          2035: 120
-          2040: 149
-          2045: 175
-          2050: 175
-      home battery: #GWh 
-        DE:
-          2020: 0
-          2025: 0
-          2030: 40
-          2035: 60
-          2040: 149
-          2045: 175
-          2050: 175
-      electrolysis:
-        DE:
-          2020: 0
-          2025: 0
-          2030: 0
-          2035: 0
-          2040: 0
-          2045: 0
-          2050: 0
-    limits_power_max: # in GW
-      DE:
-        2020: 15
-        2025: 15
-        2030: 20
-        2035: 25
-        2040: 30
-        2045: 42
-        2050: 42
+          2030: 80
+          2035: 140
+          2040: 171.81
+          2045: 197.4
