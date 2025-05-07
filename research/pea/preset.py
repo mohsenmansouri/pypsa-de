@@ -3,8 +3,8 @@ c_e_bev = ['EV battery']
 c_e_DSM = ['DSM']
 c_e_PHS = ['PHS']
 c_e_H2 = ['H2 Store']
-c_e_tank = ['rural water tanks', 'urban decentral water tanks', 'urban central water tanks']
-
+c_e_tank = ['rural water tanks', 'urban decentral water tanks']
+c_e_tank_big = ['urban central water tanks']
 c_power = ['AC', 'DC']
 c_battery = ['battery', 'home battery']
 
@@ -89,7 +89,8 @@ map_name = {
   'c_e_DSM': 'DSM',
   'c_e_PHS': 'PHS',
   'c_e_H2': 'H2',
-  'c_e_tank': 'water tank'
+  'c_e_tank': 'water tank',
+  'c_e_tank_big': 'water tank(Fernwärme)'
 
 }
 
@@ -132,6 +133,7 @@ map_color = {
   'c_e_PHS': '#5F92C3',
   'c_e_H2': '#C78D63',
   'c_e_tank':'#4F9C59',
+  'c_e_tank_big': '#72B07A'
 }
 
 map_name_color = {map_name[key]: value for key, value in map_color.items() if key in map_name}

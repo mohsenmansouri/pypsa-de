@@ -386,8 +386,8 @@ solving:
         2030: 20
         2035: 25
         2040: 30
-        2045: 42
-        2050: 42
+        2045: 45
+        2050: 45
 industry:
   steam_biomass_fraction: 0.4
   steam_hydrogen_fraction: 0.3

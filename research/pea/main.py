@@ -206,6 +206,3 @@ class Pea:
                     resultDf = pd.concat([resultDf, currentDf], axis=0)
         group = Grouper(self.n, resultDf, self.config)
         return group
-
-
-def peaExportP (pea, carrier)
