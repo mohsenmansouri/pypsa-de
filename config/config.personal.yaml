@@ -230,13 +230,13 @@ solving:
           2045: 0.0
 
       # Biomass CHP CC phase-out
-      urban_central_solid_biomass_CHP_CC:
-        phase_out_year: 2045  # Later phase-out for CC versions
-        capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 0
-          2050: 0
+      # urban_central_solid_biomass_CHP_CC:
+      #   phase_out_year: 2045  # Later phase-out for CC versions
+      #   capacity_limits:
+      #     2035: 1
+      #     2040: 1
+      #     2045: 0
+      #     2050: 0
 
       # No phase-out for H2 technologies (empty config means no constraints)
       urban_central_H2_CHP: { }
