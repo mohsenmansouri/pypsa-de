@@ -3868,7 +3868,6 @@ def add_biomass(
                 marginal_cost=costs.at["biomass boiler", "pelletizing cost"],
                 lifetime=costs.at["biomass boiler", "lifetime"],
             )
-
     # Solid biomass to liquid fuel
     if options["biomass_to_liquid"]:
         add_carrier_buses(n, "oil")
@@ -5426,6 +5425,9 @@ def add_enhanced_geothermal(
 
     if egs_config["var_cf"]:
         efficiency = pd.read_csv(egs_capacity_factors, parse_dates=True, index_col=0)
+        efficiency = efficiency.resample(
+            "3H"
+            ).mean()
         logger.info("Adding Enhanced Geothermal with time-varying capacity factors.")
     else:
         efficiency = 1.0
@@ -5488,7 +5490,7 @@ def add_enhanced_geothermal(
             p_nom_extendable=True,
             p_nom_max=p_nom_max.set_axis(well_name) / efficiency_orc,
             capital_cost=capital_cost.set_axis(well_name) * efficiency_orc,
-            efficiency=bus_eta.loc[n.snapshots],
+            efficiency= 1, #bus_eta.loc[n.snapshots],
             lifetime=costs.at["geothermal", "lifetime"],
         )
 

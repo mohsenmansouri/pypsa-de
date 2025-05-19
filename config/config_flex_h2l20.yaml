@@ -8,6 +8,9 @@ run:
   
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  # enhanced_geothermal:
+  #   enable: true
+  #   var_cf: false
   bev_dsm_availability: 0.5
   heat_pump_flexibility: true
   resistive_heaters: true
@@ -62,7 +65,7 @@ solving:
   options:
     load_shedding: 1200
   constraints:
-    test: 20
+    test: 21
     limits_capacity_max:
       Generator:
         load:
@@ -72,6 +75,18 @@ solving:
             2040: 2.631
             2045: 3
       Link:
+        urban decentral biomass boilers:
+          DE:
+            2030: 2
+            2035: 4
+            2040: 7
+            2045: 10
+        rural biomass boilers:
+          DE:
+            2030: 1
+            2035: 2
+            2040: 3.5
+            2045: 5
         DSM dispatch:
           DE:
             2030: 7.25
@@ -96,19 +111,19 @@ solving:
             2035: 0
             2040: 0
             2045: 0
-        # H2 OCGT:
-        #   DE:
-        #     2025: 0
-        #     2030: 51
-        #     2035: 80
-        #     2040: 100
-        #     2045: 120.2
-        # H2 Fuel Cell:
-        #   DE:
-        #     2025: 0
-        #     2035: 0
-        #     2040: 0
-        #     2045: 0
+        H2 OCGT:
+          DE:
+            2025: 0
+            2030: 10
+            2035: 20
+            2040: 40
+            2045: 47
+        H2 Fuel Cell:
+          DE:
+            2025: 0
+            2035: 0
+            2040: 0
+            2045: 0
         home battery discharger:
           DE:
             2039: 20

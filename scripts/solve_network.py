@@ -1150,21 +1150,21 @@ def phase_out_conventional_generators(n, config=None):
         "H2_retrofit_OCGT": {
             "patterns": ["H2 retrofit", "hydrogen retrofit"]
         },
-        "urban_central_solid_biomass_CHP": {
-            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
-            "exclude": ["CC", "cc"]
-        },
-        "urban_central_solid_biomass_CHP_CC": {
-            "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
-            "require": ["CC", "cc"]
-        },
-        "other_biomass": {
-            "patterns":["urban decentral biomass boiler",  "rural biomass boiler"] 
-        },
-        "urban_central_gas_boiler": {
-            "patterns": ["urban central gas boiler"],
-            "require": ['boiler']
-        }
+        # "urban_central_solid_biomass_CHP": {
+        #     "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
+        #     "exclude": ["CC", "cc"]
+        # },
+        # "urban_central_solid_biomass_CHP_CC": {
+        #     "patterns": ["urban central solid biomass", "solid biomass CHP", "biomass CHP",],
+        #     "require": ["CC", "cc"]
+        # },
+        # "other_biomass": {
+        #     "patterns":["urban decentral biomass boiler",  "rural biomass boiler"] 
+        # },
+        # "urban_central_gas_boiler": {
+        #     "patterns": ["urban central gas boiler"],
+        #     "require": ['boiler']
+        # }
     }
 
     # Process each technology type
