@@ -13,6 +13,7 @@ c_pg_coal_oil = ['urban central lignite CHP', 'urban central oil CHP', 'coal', '
 c_pg_h2 = ['H2 Fuel Cell', 'H2 OCGT', 'urban central H2 CHP']
 c_pg_retrofit_h2 = ['H2 retrofit OCGT', 'urban central H2 retrofit CHP']
 c_pg_load = ['load']
+c_pg_gas = ['urban central gas CHP CC', 'urban central gas CHP', 'CCGT', 'OCGT','urban central lignite CHP', 'urban central oil CHP', 'coal', 'oil', 'H2 Fuel Cell', 'H2 OCGT', 'urban central H2 CHP','H2 retrofit OCGT', 'urban central H2 retrofit CHP']
 
 c_pg_import = c_power
 c_pg_inner_import = c_power
@@ -52,6 +53,7 @@ c_pc_export = c_power
 c_pc_inner_export = c_power
 
 map_name = {
+  'c_pg_gas': 'h2/gas generation',
   'c_pg_natgas': 'natgas generation',
   'c_pg_h2': 'hydrogen generation',
   'c_pg_retrofit_h2': 'retrofit H2 generation',
@@ -97,21 +99,22 @@ map_name = {
 map_color = {
   'c_pg_natgas': '#4A4A4A',
   'c_pg_h2': '#6F6F6F',
+  'c_pg_gas': '#6F6F6F',
   'c_pg_retrofit_h2': '#939393',
   'c_pg_coal_oil': '#B7B7B7',
   'c_pg_inner_import': '#765FB4',
   'c_pg_import': '#5438A1',
-  'c_pg_battery': '#3777B4',
-  'c_pg_phs': '#5F92C3',
-  'c_pg_dsm': '#87AED2',
+  'c_pg_battery': '#4F9C59', 
+  'c_pg_phs': '#72B07A', 
+  'c_pg_dsm': '#95C49B', # '#87AED2',
   'c_pg_load': '#AFC9E1',
   'c_pg_biomass': '#48A299',
   'c_pg_biogas': '#B6DAD6',
   'c_pg_waste': '#6DB4AD',
   'c_pg_water': '#91C7C2',
-  'c_pg_onwind': '#4F9C59',
-  'c_pg_offwind': '#72B07A',
-  'c_pg_pv': '#95C49B',
+  'c_pg_onwind': '#3777B4', 
+  'c_pg_offwind': '#5F92C3',
+  'c_pg_pv': '#d4a017',
 
   'c_pc_ghd': '#CB9B47',
   'c_pc_industry': '#D6AF6B',
