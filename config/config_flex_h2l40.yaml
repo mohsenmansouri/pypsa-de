@@ -1,0 +1,214 @@
+# SPDX-FileCopyrightText: : 2017-2023 The PyPSA-Eur Authors
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
+run:
+  prefix: 20250414-NEP-flex
+  
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
+sector:
+  enhanced_geothermal:
+    enable: false
+    var_cf: false
+  bev_dsm_availability: 0.5
+  heat_pump_flexibility: true
+  resistive_heaters: true
+  tes_tau:
+    decentral: 6
+    central: 180
+
+  low_voltage_dsm:
+    enable: true
+    #scenario: "enhanced_flexibility"  # Add this identifier
+    "2030":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+    "2040":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+    "2045":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 2
+
+solving:
+  options:
+    load_shedding: 1200
+  constraints:
+    test: 24
+    limits_capacity_max:
+      Generator:
+        load:
+          DE:
+            2030: 1.594
+            2037: 2.063
+            2040: 2.631
+            2045: 3
+      Link:
+        # urban decentral biomass boilers:
+        #   DE:
+        #     2030: 2
+        #     2035: 4
+        #     2040: 7
+        #     2045: 10
+        # rural biomass boilers:
+        #   DE:
+        #     2030: 1
+        #     2035: 2
+        #     2040: 3.5
+        #     2045: 5
+        DSM dispatch:
+          DE:
+            2030: 7.25
+            2037: 14.5
+            2040: 21.75
+            2045: 29
+        DSM charge:
+          DE:
+            2030: 7.25
+            2037: 14.5
+            2040: 21.75
+            2045: 29
+        SMR:
+          DE:
+            2030: 0
+            2035: 0
+            2040: 0
+            2045: 0
+        SMR CC:
+          DE:
+            2030: 0
+            2035: 0
+            2040: 0
+            2045: 0
+        H2 OCGT:
+          DE:
+            2025: 0
+            2030: 20
+            2035: 60
+            2040: 80
+            2045: 94.118
+        H2 Fuel Cell:
+          DE:
+            2025: 0
+            2035: 0
+            2040: 0
+            2045: 0
+        home battery discharger:
+          DE:
+            2039: 20
+            2035: 50
+            2040: 68.907
+            2045: 78.75
+        battery discharger:
+          DE:
+            2030: 20
+            2035: 30
+            2040: 40.95
+            2045: 46.2
+    limits_capacity_min:
+      Link:
+        DSM dispatch:
+          DE:
+            2030: 6.0
+            2037: 7.0
+            2040: 10.0
+            2045: 12.9
+        DSM charge:
+          DE:
+            2030: 6.0
+            2035: 7.0
+            2040: 10.0
+            2045: 12.9
+        battery discharger:
+          DE:
+            2030: 15
+            2035: 25
+            2040: 39
+            2045: 44
+        home battery discharger:
+          DE:
+            2030: 18
+            2035: 45
+            2040: 62.6
+            2045: 75     
+    limits_volume_min:
+      # water central tank:
+      #   DE:
+      #     2020: 0
+      #     2025: 0
+      #     2030: 1000
+      #     2035: 2000
+      #     2040: 3000
+      #     2045: 4000
+      # water decentral tank:
+      #   DE:
+      #     2020: 0
+      #     2025: 0
+      #     2030: 50
+      #     2035: 100
+      #     2040: 200
+      #     2045: 300
+      battery: 
+        DE:
+          2020: 0
+          2025: 0
+          2030: 18
+          2035: 46
+          2040: 110
+          2045: 175
+      home battery:
+        DE:
+          2020: 0
+          2025: 0
+          2030: 79
+          2035: 116
+          2040: 152
+          2045: 188
+    limits_volume_max:
+      battery: #GWh 149， 175
+        DE:
+          2020: 0
+          2025: 0
+          2030: 20
+          2035: 60.21
+          2040: 116.15
+          2045: 183.75
+      home battery: #GWh 72， 143
+        DE:
+          2020: 0
+          2025: 0
+          2030: 80
+          2035: 140
+          2040: 171.81
+          2045: 197.4
