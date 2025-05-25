@@ -11,5 +11,35 @@ sector:
   bev_dsm_availability: 0
   heat_pump_flexibility: false
   
+
 solving:
-  test: 8
+  options:
+    load_shedding: 1200
+  constraints:
+    limits_volume_max:
+      water central tank:
+        DE:
+          2020: 0
+          2025: 0
+          2030: 500
+          2035: 1000
+          2040: 1500
+          2045: 2000
+      battery:
+        DE:
+          2020: 0
+          2025: 0
+          2030: 50.0
+          2035: 62.1
+          2040: 68.5
+          2045: 68.5
+          2050: 75.6
+      home battery: #GWh 72， 143
+        DE:
+          2020: 0
+          2025: 0
+          2030: 63.9
+          2035: 81.9
+          2040: 99.9
+          2045: 117.9
+          2050: 131
