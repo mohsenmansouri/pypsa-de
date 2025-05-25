@@ -272,6 +272,9 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
+  tes_tau:
+    decentral: 4
+    central: 180
   v2g: false
   solar_thermal: false
   district_heating:

@@ -10,43 +10,6 @@ run:
 sector:
   bev_dsm_availability: 0
   heat_pump_flexibility: false
-  tes_tau:
-    decentral: 3
-    central: 180
   
 solving:
-  test: 7
-  constraints:
-    limits_capacity_max:
-      Link:
-        home battery discharger:
-          DE:
-            2030: 26.5
-            2035: 33.3
-            2040: 40.5
-            2045: 46.8
-        battery discharger:
-          DE:
-            2030: 13.84
-            2035: 15.52
-            2040: 17.21
-            2045: 18.9
-    limits_volume_max:
-      battery: #GWh 149， 175
-        DE:
-          2020: 0
-          2025: 0
-          2030: 50.0
-          2035: 62.1
-          2040: 68.5
-          2045: 68.5
-          2050: 75.6
-      home battery: #GWh 72， 143
-        DE:
-          2020: 0
-          2025: 0
-          2030: 63.9
-          2035: 81.9
-          2040: 99.9
-          2045: 117.9
-          2050: 131
+  test: 8

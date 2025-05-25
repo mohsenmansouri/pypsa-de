@@ -8,15 +8,8 @@ run:
   
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
 sector:
-  enhanced_geothermal:
-    enable: false
-    var_cf: false
   bev_dsm_availability: 0.5
-  heat_pump_flexibility: true
-  resistive_heaters: true
-  tes_tau:
-    decentral: 6
-    central: 180
+  heat_pump_flexibility: true 
 
   low_voltage_dsm:
     enable: true
@@ -59,13 +52,13 @@ sector:
         s_flex: 0.5
         s_inc: 0.9
         s_dec: 0.5
-        delta_t: 2
+        delta_t: 3
 
 solving:
   options:
     load_shedding: 1200
   constraints:
-    test: 24
+    test: 2
     limits_capacity_max:
       Generator:
         load:
@@ -75,93 +68,68 @@ solving:
             2040: 2.631
             2045: 3
       Link:
-        # urban decentral biomass boilers:
-        #   DE:
-        #     2030: 2
-        #     2035: 4
-        #     2040: 7
-        #     2045: 10
-        # rural biomass boilers:
-        #   DE:
-        #     2030: 1
-        #     2035: 2
-        #     2040: 3.5
-        #     2045: 5
         DSM dispatch:
           DE:
-            2030: 7.25
-            2037: 14.5
-            2040: 21.75
-            2045: 29
+            2030: 3
+            2037: 6
+            2040: 9
+            2045: 12
         DSM charge:
           DE:
-            2030: 7.25
-            2037: 14.5
-            2040: 21.75
-            2045: 29
-        SMR:
-          DE:
-            2030: 0
-            2035: 0
-            2040: 0
-            2045: 0
-        SMR CC:
-          DE:
-            2030: 0
-            2035: 0
-            2040: 0
-            2045: 0
+            2030: 3
+            2037: 6
+            2040: 9
+            2045: 12
         H2 OCGT:
           DE:
-            2025: 0
-            2030: 20
-            2035: 60
-            2040: 80
-            2045: 94.118
+            2030: 94.1
+            2035: 94.1
+            2040: 94.1
+            2045: 94.1
         H2 Fuel Cell:
           DE:
             2025: 0
             2035: 0
             2040: 0
             2045: 0
-        home battery discharger:
-          DE:
-            2039: 20
-            2035: 50
-            2040: 68.907
-            2045: 78.75
         battery discharger:
           DE:
-            2030: 20
-            2035: 30
-            2040: 40.95
-            2045: 46.2
+            2030: 15
+            2035: 33.2
+            2040: 71.1
+            2045: 109
+        home battery discharger:
+          DE:
+            2030: 54.3
+            2035: 111.8
+            2040: 169.3
+            2045: 226.8 
     limits_capacity_min:
       Link:
         DSM dispatch:
           DE:
-            2030: 6.0
-            2037: 7.0
-            2040: 10.0
-            2045: 12.9
+            2030: 3
+            2037: 6
+            2040: 9
+            2045: 12
         DSM charge:
           DE:
-            2030: 6.0
-            2035: 7.0
-            2040: 10.0
-            2045: 12.9
+            2030: 3
+            2035: 6
+            2040: 9
+            2045: 12
         battery discharger:
           DE:
-            2030: 15
-            2035: 25
-            2040: 39
-            2045: 44
+            2030: 10
+            2035: 16
+            2040: 35.6
+            2045: 54.5
         home battery discharger:
           DE:
-            2030: 18
-            2035: 45
-            2040: 62.6
-            2045: 75     
+            2030: 27.1
+            2035: 55.9
+            2040: 84.6
+            2045: 113.4  
     limits_volume_min:
       # water central tank:
       #   DE:
@@ -181,34 +149,26 @@ solving:
       #     2045: 300
       battery: 
         DE:
-          2020: 0
-          2025: 0
-          2030: 18
-          2035: 46
-          2040: 110
-          2045: 175
+          2030: 10
+          2035: 50
+          2040: 111
+          2045: 216
       home battery:
         DE:
-          2020: 0
-          2025: 0
-          2030: 79
-          2035: 116
-          2040: 152
-          2045: 188
+          2030: 65.1
+          2035: 138.1
+          2040: 211.2
+          2045: 284.2
     limits_volume_max:
-      battery: #GWh 149， 175
+      battery: 
         DE:
-          2020: 0
-          2025: 0
           2030: 20
-          2035: 60.21
-          2040: 116.15
-          2045: 183.75
-      home battery: #GWh 72， 143
+          2035: 70
+          2040: 223.0
+          2045: 433.5
+      home battery:
         DE:
-          2020: 0
-          2025: 0
-          2030: 80
-          2035: 140
-          2040: 171.81
-          2045: 197.4
+          2030: 130.2
+          2035: 276.3
+          2040: 422.4
+          2045: 568.5

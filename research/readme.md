@@ -3,8 +3,9 @@ snakemake -call all --configfile config/config.public.yaml --cores all
 snakemake -call all --configfile config/config_flex.yaml --cores all
 
 snakemake -call all --configfile config/config_gas.yaml --cores all
-snakemake -call all --configfile config/config_gas_mm.yaml --cores all
-snakemake -call all --configfile config/config_flex_h2l20.yaml --cores all
+snakemake -call all --configfile config/config_flex_limit_h2_40.yaml --cores all
+snakemake -call all --configfile config/config_flex_limit_h2_20.yaml --cores all
+
 
 conda env list
 conda env remove --name pypsa-de
