@@ -1,4 +1,4 @@
-name: pypsa-de
+name: mm2-pypsa-de
 channels:
   - conda-forge
   - bioconda
