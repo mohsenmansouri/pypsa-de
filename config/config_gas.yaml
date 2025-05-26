@@ -13,8 +13,6 @@ sector:
   
 
 solving:
-  options:
-    load_shedding: 1200
   constraints:
     limits_volume_max:
       water central tank:
