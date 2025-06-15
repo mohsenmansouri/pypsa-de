@@ -244,7 +244,6 @@ def h2_import_limits(n, investment_year, limits_volume_max):
         )
 
 def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max):
-    
     for carrier in ["battery", "home battery"]:
         for ct in limits_volume_max.get(carrier, {}):
             if investment_year in limits_volume_max.get(carrier, {}).get(ct, {}):
@@ -282,37 +281,39 @@ def add_battery_limits(n, investment_year, limits_volume_min, limits_volume_max)
 
 def add_water_tank_limits(n, investment_year, limits_volume_min, limits_volume_max):
     for ct in limits_volume_min.get("water decentral tank", {}):
-        stores = n.stores[
-            ((n.stores.carrier == "rural water tanks") | (n.stores.carrier == "urban decentral water tanks")) & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'])
-        ].index
-        nom_store = n.stores[
-                    ((n.stores.carrier == "rural water tanks") | (n.stores.carrier == "urban decentral water tanks")) & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'] == False)
-                ].e_nom
-        nom_store_sum = 0
-        if nom_store is not None:
-            nom_store_sum = nom_store.sum()
-        lhs = n.model["Store-e_nom"].loc[stores].sum() / 10
+        if investment_year in limits_volume_min.get("water decentral tank", {}).get(ct, {}):
+            stores = n.stores[
+                ((n.stores.carrier == "rural water tanks") | (n.stores.carrier == "urban decentral water tanks")) & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'])
+            ].index
+            nom_store = n.stores[
+                        ((n.stores.carrier == "rural water tanks") | (n.stores.carrier == "urban decentral water tanks")) & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'] == False)
+                    ].e_nom
+            nom_store_sum = 0
+            if nom_store is not None:
+                nom_store_sum = nom_store.sum()
+            lhs = n.model["Store-e_nom"].loc[stores].sum() / 10
 
-        limit_lower = (limits_volume_min["water decentral tank"][ct][investment_year] * 1e3 - nom_store_sum)/ 10
-        cname_lower = f"water_decentral_tank_volume_limit_lower-{ct}"
-        n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+            limit_lower = (limits_volume_min["water decentral tank"][ct][investment_year] * 1e3 - nom_store_sum)/ 10
+            cname_lower = f"water_decentral_tank_volume_limit_lower-{ct}"
+            n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
 
 def add_water_center_tank_limits(n, investment_year, limits_volume_min, limits_volume_max):
     for ct in limits_volume_min.get("water central tank", {}):
-        stores = n.stores[
-            (n.stores.carrier == "urban central water tanks") & (n.stores.bus.str.contains(ct)) & (n.stores['e_nom_extendable'])
-        ].index
-        nom_store = n.stores[
-                (n.stores.carrier == "urban central water tanks") & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'] == False)
-            ].e_nom
-        nom_store_sum = 0
-        if nom_store is not None:
-            nom_store_sum = nom_store.sum()
-        lhs = n.model["Store-e_nom"].loc[stores].sum() / 10
+        if investment_year in limits_volume_min.get("water central tank", {}).get(ct, {}):
+            stores = n.stores[
+                (n.stores.carrier == "urban central water tanks") & (n.stores.bus.str.contains(ct)) & (n.stores['e_nom_extendable'])
+            ].index
+            nom_store = n.stores[
+                    (n.stores.carrier == "urban central water tanks") & (n.stores.bus.str.contains(ct) ) & (n.stores['e_nom_extendable'] == False)
+                ].e_nom
+            nom_store_sum = 0
+            if nom_store is not None:
+                nom_store_sum = nom_store.sum()
+            lhs = n.model["Store-e_nom"].loc[stores].sum() / 10
 
-        limit_lower = (limits_volume_min["water central tank"][ct][investment_year] * 1e3 - nom_store_sum)/ 10
-        cname_lower = f"water_central_tank_volume_limit_lower-{ct}"
-        n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
+            limit_lower = (limits_volume_min["water central tank"][ct][investment_year] * 1e3 - nom_store_sum)/ 10
+            cname_lower = f"water_central_tank_volume_limit_lower-{ct}"
+            n.model.add_constraints(lhs >= limit_lower, name=f"GlobalConstraint-{cname_lower}")
 
 
 def h2_production_limits(n, investment_year, limits_volume_min, limits_volume_max):

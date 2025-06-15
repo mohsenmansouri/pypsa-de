@@ -21,6 +21,7 @@ c_pg_inner_import = c_power
 c_pg_battery = ['battery discharger', 'home battery discharger']
 c_pg_phs = ['PHS']
 c_pg_dsm = ['DSM dispatch']
+c_pg_v2g = ['V2G']
 
 c_pg_biomass = ['urban central solid biomass CHP', 'urban central solid biomass CHP CC']
 c_pg_waste = ['waste CHP', 'waste CHP CC']
@@ -71,6 +72,7 @@ map_name = {
   'c_pg_pv': 'Solar',
   'c_pg_biogas': 'biogas',
   'c_pg_coal_oil': 'coal/oil',
+  'c_pg_v2g': 'V2G',
 
   'c_pc_ghd': 'electricity GHD/Private Haushalte',
   'c_pc_industry': 'electricity industry',
@@ -107,6 +109,7 @@ map_color = {
   'c_pg_phs':  '#6DB4AD',
   'c_pg_dsm': '#91C7C2',
   'c_pg_load':'#B6DAD6',
+  'c_pg_v2g':'#B6DAD6',
   'c_pg_biomass': '#4F9C59',
   'c_pg_biogas': '#B9D8BD',
   'c_pg_waste': '#72B07A',
