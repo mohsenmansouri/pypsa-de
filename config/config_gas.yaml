@@ -10,6 +10,48 @@ run:
 sector:
   bev_dsm_availability: 0
   heat_pump_flexibility: false
+  low_voltage_dsm:
+    enable: true
+    #scenario: "enhanced_flexibility"  # Add this identifier
+    "2030":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 1
+    "2040":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 1
+    "2045":
+      electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 1
+        s_dec: 0
+        delta_t: 1
+      industry electricity:
+        s_util: 0.67
+        s_flex: 0.5
+        s_inc: 0.9
+        s_dec: 0.5
+        delta_t: 1
   
 
 solving:
@@ -41,3 +83,17 @@ solving:
           2040: 99.9
           2045: 117.9
           2050: 131
+    limits_capacity_max:
+      Link:
+        DSM dispatch:
+          DE:
+            2030: 1
+            2037: 3
+            2040: 5
+            2045: 6
+        DSM charge:
+          DE:
+            2030: 1
+            2037: 3
+            2040: 5
+            2045: 6

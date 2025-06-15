@@ -13,3 +13,6 @@ conda env create -f envs/environment.yaml
 conda env create -f envs/macos-pinned.yaml
 conda activate pypsa-de
 conda activate mm2-pypsa-de
+
+
+jupyter nbconvert ppt.ipynb --to html --TagRemovePreprocessor.remove_cell_tags='{"hide"}'

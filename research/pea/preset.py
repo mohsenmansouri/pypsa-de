@@ -46,7 +46,7 @@ c_pc_heat_pump = ['urban central air heat pump', 'rural air heat pump', 'rural g
 c_pc_dac = ['DAC']
 c_pc_resistive = ['urban central resistive heater', 'rural resistive heater', 'urban decentral resistive heater']
 
-c_pc_battery = ['battery charger', 'home battery charge']
+c_pc_battery = ['battery charger', 'home battery charger']
 c_pc_phs = ['PHS']
 c_pc_dsm = ['DSM store']
 c_pc_export = c_power

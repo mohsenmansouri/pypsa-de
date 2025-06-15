@@ -72,7 +72,7 @@ solving:
           2035: 0
           2040: 0
           2045: 0        
-    heat_pumps:
+    heat_pumps:  #TODO@CC need migrate
       apply_constraints: true
       active_scenario: "conservative"
       countries: [ "DE" ]
@@ -153,7 +153,7 @@ solving:
             rural ground heat pump: { min: 5500, max: 5500 }
             urban central air heat pump: { min: 13150, max: 13150 }
             urban decentral air heat pump: { min: 13150, max: 13150 }
-    generator_phaseout:
+    generator_phaseout:  #TODO@CC need migrate
       apply_constraints: true
 
       # CCGT phase-out
@@ -169,28 +169,28 @@ solving:
       OCGT:
         phase_out_year: 2050
         capacity_limits:
-          2030: 0.6
-          2035: 0.3
-          2040: 0.2
-          2045: 0.0
+          # 2030: 0.6
+          # 2035: 0.3
+          # 2040: 0.2
+          # 2045: 0.0
           2050: 0.0
 
       # Urban gas CHP phase-out
       urban_central_gas_CHP:
         phase_out_year: 2045
         capacity_limits:
-          2030: 0.8
-          2035: 0.5
-          2040: 0.2
+          # 2030: 0.8
+          # 2035: 0.5
+          # 2040: 0.2
           2045: 0.0
 
       # CC CHP gas phase-out (can be different from non-CC)
       urban_central_gas_CHP_CC:
         phase_out_year: 2045
         capacity_limits:
-          2035: 1
-          2040: 1
-          2045: 0
+          # 2035: 1
+          # 2040: 1
+          # 2045: 0
           2050: 0
 
       # Urban oil CHP phase-out
@@ -225,7 +225,7 @@ solving:
       urban_central_H2_CHP: { }
       H2_OCGT: { }
       H2_retrofit_OCGT: { }
-    resistive_heaters:
+    resistive_heaters: #TODO@CC need migrate
       apply_constraints: true
       active_scenario: "restrictive"
       countries: [ "DE" ]

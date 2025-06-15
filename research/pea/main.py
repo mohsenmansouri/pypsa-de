@@ -74,9 +74,13 @@ class Grouper:
 
         return resultDf
 
-    def capital_cost(self, ):
+    def capital_cost(self, prop = "p_nom_opt"):
         try:
-          total_s = self.df["capital_cost"] * self.df["p_nom_opt"]
+          df = self.df
+        #   df = df[df['p_nom_extendable']== True]
+
+
+          total_s = df["capital_cost"] * df[prop]
           return  total_s.sum()
         except:
           return 0
@@ -91,8 +95,8 @@ class Grouper:
         except:
           return 0
         
-    def total_cost(self, p="p"):
-        return self.capital_cost() + self.opex_cost(p)
+    def total_cost(self, p="p", prop="p_nom_opt"):
+        return self.capital_cost(prop) + self.opex_cost(p)
         
     def p_nom_opt(self, p= None):
         try:

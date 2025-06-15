@@ -10,6 +10,7 @@ run:
 sector:
   bev_dsm_availability: 0.5
   heat_pump_flexibility: true 
+  v2g: true
 
   low_voltage_dsm:
     enable: true
